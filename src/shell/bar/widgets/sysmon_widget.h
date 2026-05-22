@@ -2,6 +2,7 @@
 
 #include "core/timer_manager.h"
 #include "shell/bar/widget.h"
+#include "ui/signal.h"
 
 #include <chrono>
 #include <string>
@@ -38,6 +39,7 @@ private:
   [[nodiscard]] static const char* glyphName(SysmonStat stat);
   void scheduleNextUpdate(std::chrono::steady_clock::time_point latestSampleAt);
   void clearGraph();
+  void syncVisualPalette();
   void updateGraph(Renderer& renderer);
   [[nodiscard]] float scrollProgressForSample(std::chrono::steady_clock::time_point sampledAt) const;
   [[nodiscard]] static double normalizedFromStats(SysmonStat stat, const SystemStats& stats, double& tempMin,
@@ -69,4 +71,6 @@ private:
 
   // Gauge mode
   ProgressBar* m_gauge = nullptr;
+
+  Signal<>::ScopedConnection m_paletteConn;
 };
