@@ -691,7 +691,7 @@ namespace settings {
         add(std::move(maxLabelChars));
       }
       {
-        auto pillScale = doubleSpec("pill_scale", 1.0, 0.1, 1.0, 0.1);
+        auto pillScale = doubleSpec("pill_scale", 1.0, 0.1, 1.0, 0.05);
         pillScale.descriptionKey = "settings.widgets.settings.pill_scale.workspaces-description";
         pillScale.visibleWhen = pillStyleOnly;
         add(std::move(pillScale));
