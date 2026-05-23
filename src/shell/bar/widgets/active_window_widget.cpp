@@ -16,9 +16,9 @@
 #include <string_view>
 
 ActiveWindowWidget::ActiveWindowWidget(CompositorPlatform& platform, float maxWidth, float minWidth, float iconSize,
-                                       ActiveWindowTitleScrollMode titleScrollMode, bool iconOnly)
+                                       ActiveWindowTitleScrollMode titleScrollMode, ActiveWindowDisplayMode displayMode)
     : m_platform(platform), m_maxWidth(maxWidth), m_minWidth(minWidth), m_iconSize(iconSize),
-      m_titleScrollMode(titleScrollMode), m_iconOnly(iconOnly) {
+      m_titleScrollMode(titleScrollMode), m_displayMode(displayMode) {
   buildDesktopIconIndex();
 }
 
@@ -70,32 +70,37 @@ void ActiveWindowWidget::doLayout(Renderer& renderer, float containerWidth, floa
   const float maxLength = std::max(0.0f, m_maxWidth * m_contentScale);
   const float minLength = std::clamp(m_minWidth * m_contentScale, 0.0f, maxLength);
   m_icon->setSize(iconSize, iconSize);
-  m_icon->setVisible(true);
 
   m_title->setColor(widgetForegroundOr(colorSpecFromRole(ColorRole::OnSurface)));
 
   if (isVertical) {
     m_title->setVisible(false);
     applyTitleScrollMode(false);
+    m_icon->setVisible(true);
     m_icon->setPosition(0.0f, 0.0f);
     rootNode->setSize(m_icon->width(), m_icon->height());
   } else {
-    const bool showTitle = !m_iconOnly && !m_lastTitle.empty();
+    const bool showIcon = m_displayMode != ActiveWindowDisplayMode::TextOnly;
+    const bool showTitle = m_displayMode != ActiveWindowDisplayMode::IconOnly && !m_lastTitle.empty();
+    m_icon->setVisible(showIcon);
     m_title->setVisible(showTitle);
     applyTitleScrollMode(showTitle);
-    const float spacing = showTitle ? Style::spaceXs : 0.0f;
-    const float labelMaxWidth = showTitle ? std::max(0.0f, maxLength - m_icon->width() - spacing) : 0.0f;
+    const float spacing = showIcon && showTitle ? Style::spaceXs : 0.0f;
+    const float iconWidth = showIcon ? m_icon->width() : 0.0f;
+    const float labelMaxWidth = showTitle ? std::max(0.0f, maxLength - iconWidth - spacing) : 0.0f;
     m_title->setMaxWidth(labelMaxWidth);
     m_title->measure(renderer);
 
-    const float contentHeight = std::max(m_icon->height(), m_title->height());
-    const float iconY = std::round((contentHeight - m_icon->height()) * 0.5f);
+    const float iconHeight = showIcon ? m_icon->height() : 0.0f;
+    const float titleHeight = showTitle ? m_title->height() : 0.0f;
+    const float contentHeight = std::max(iconHeight, titleHeight);
+    const float iconY = showIcon ? std::round((contentHeight - m_icon->height()) * 0.5f) : 0.0f;
     const float labelY = std::round((contentHeight - m_title->height()) * 0.5f);
 
     m_icon->setPosition(0.0f, iconY);
-    m_title->setPosition(m_icon->width() + spacing, labelY);
+    m_title->setPosition(showIcon ? m_icon->width() + spacing : 0.0f, labelY);
 
-    const float contentWidth = showTitle ? m_title->x() + m_title->width() : m_icon->width();
+    const float contentWidth = showTitle ? m_title->x() + m_title->width() : iconWidth;
     rootNode->setSize(std::clamp(contentWidth, minLength, maxLength), contentHeight);
   }
 }

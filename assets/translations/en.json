@@ -1104,6 +1104,8 @@
         "graph": "Graph",
         "graphic": "Graphic",
         "icon": "Icon",
+        "icon-and-text": "Icon and Text",
+        "icon-only": "Icon Only",
         "id": "ID",
         "input": "Input",
         "instance": "Per Placement",
@@ -1121,7 +1123,8 @@
         "workspace-label-centered": "Centered",
         "workspace-label-inside": "Inside pill",
         "swap-percent": "Swap Percent",
-        "text": "Text"
+        "text": "Text",
+        "text-only": "Text Only"
       },
       "settings": {
         "anchor": {
@@ -1193,7 +1196,8 @@
         },
         "display": {
           "label": "Display",
-          "description": "Display mode for this widget"
+          "description": "Display mode for this widget",
+          "active-window-description": "Icon, title, or both on horizontal bars. Vertical bars stay icon-only."
         },
         "display_mode": {
           "label": "Display Mode",
@@ -1303,11 +1307,6 @@
         "hide_label": {
           "label": "Hide Label",
           "description": "Hide this widget's text label"
-        },
-        "icon_only": {
-          "label": "Icon Only",
-          "description": "Show only an icon without a text label",
-          "active-window-description": "On horizontal bars, show only the active window icon (vertical bars already use the icon only)"
         },
         "high_color": {
           "label": "High Color",

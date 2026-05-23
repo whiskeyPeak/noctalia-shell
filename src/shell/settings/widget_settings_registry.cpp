@@ -480,6 +480,11 @@ namespace settings {
         {"always", "settings.widgets.options.always"},
         {"on_hover", "settings.widgets.options.on-hover"},
     };
+    const std::vector<WidgetSettingSelectOption> activeWindowDisplay = {
+        {"icon_and_text", "settings.widgets.options.icon-and-text"},
+        {"icon_only", "settings.widgets.options.icon-only"},
+        {"text_only", "settings.widgets.options.text-only"},
+    };
     const std::vector<WidgetSettingSelectOption> scriptedScopes = {
         {"instance", "settings.widgets.options.instance"},
         {"shared", "settings.widgets.options.shared"},
@@ -494,9 +499,9 @@ namespace settings {
       add(doubleSpec("icon_size", static_cast<double>(Style::fontSizeBody), 8.0, 64.0, 1.0));
       add(selectSpec("title_scroll", "none", mediaTitleScroll));
       {
-        auto iconOnly = boolSpec("icon_only", false);
-        iconOnly.descriptionKey = "settings.widgets.settings.icon_only.active-window-description";
-        add(std::move(iconOnly));
+        auto display = selectSpec("display", "icon_and_text", activeWindowDisplay);
+        display.descriptionKey = "settings.widgets.settings.display.active-window-description";
+        add(std::move(display));
       }
     } else if (type == "audio_visualizer") {
       add(doubleSpec("width", 56.0, 8.0, 400.0, 1.0));

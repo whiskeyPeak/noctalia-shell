@@ -19,10 +19,17 @@ enum class ActiveWindowTitleScrollMode : std::uint8_t {
   OnHover,
 };
 
+enum class ActiveWindowDisplayMode : std::uint8_t {
+  IconAndText,
+  IconOnly,
+  TextOnly,
+};
+
 class ActiveWindowWidget : public Widget {
 public:
   ActiveWindowWidget(CompositorPlatform& platform, float maxWidth, float minWidth, float iconSize,
-                     ActiveWindowTitleScrollMode titleScrollMode, bool iconOnly = false);
+                     ActiveWindowTitleScrollMode titleScrollMode,
+                     ActiveWindowDisplayMode displayMode = ActiveWindowDisplayMode::IconAndText);
 
   void create() override;
 
@@ -39,7 +46,7 @@ private:
   float m_minWidth = 80.0f;
   float m_iconSize = 16.0f;
   ActiveWindowTitleScrollMode m_titleScrollMode = ActiveWindowTitleScrollMode::None;
-  bool m_iconOnly = false;
+  ActiveWindowDisplayMode m_displayMode = ActiveWindowDisplayMode::IconAndText;
   InputArea* m_area = nullptr;
   Image* m_icon = nullptr;
   Label* m_title = nullptr;

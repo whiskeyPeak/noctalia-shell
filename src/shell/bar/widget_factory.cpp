@@ -71,6 +71,16 @@ namespace {
     return ActiveWindowTitleScrollMode::None;
   }
 
+  ActiveWindowDisplayMode parseActiveWindowDisplayMode(std::string_view value) {
+    if (value == "icon_only") {
+      return ActiveWindowDisplayMode::IconOnly;
+    }
+    if (value == "text_only") {
+      return ActiveWindowDisplayMode::TextOnly;
+    }
+    return ActiveWindowDisplayMode::IconAndText;
+  }
+
   MediaTitleScrollMode parseMediaTitleScrollMode(std::string_view value) {
     if (value == "always") {
       return MediaTitleScrollMode::Always;
@@ -119,9 +129,11 @@ std::unique_ptr<Widget> WidgetFactory::create(const std::string& name, wl_output
     const float iconSize =
         static_cast<float>(wc != nullptr ? wc->getDouble("icon_size", Style::fontSizeBody) : Style::fontSizeBody);
     const std::string titleScroll = wc != nullptr ? wc->getString("title_scroll", "none") : std::string("none");
-    const bool iconOnly = wc != nullptr ? wc->getBool("icon_only", false) : false;
+    const std::string displayMode =
+        wc != nullptr ? wc->getString("display", "icon_and_text") : std::string("icon_and_text");
     auto widget = std::make_unique<ActiveWindowWidget>(m_platform, maxWidth, minWidth, iconSize,
-                                                       parseActiveWindowTitleScrollMode(titleScroll), iconOnly);
+                                                       parseActiveWindowTitleScrollMode(titleScroll),
+                                                       parseActiveWindowDisplayMode(displayMode));
     widget->setContentScale(contentScale);
     return widget;
   }
