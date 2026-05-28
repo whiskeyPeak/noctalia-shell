@@ -10,6 +10,7 @@
 #include "compositors/sway/sway_workspace_backend.h"
 #include "compositors/triad/triad_workspace_backend.h"
 #include "core/log.h"
+#include "dwl-ipc-unstable-v2-client-protocol.h"
 
 #include <string>
 
@@ -70,8 +71,21 @@ void WaylandWorkspaces::bindExtWorkspace(ext_workspace_manager_v1* manager) {
 }
 
 void WaylandWorkspaces::bindDwlIpcWorkspace(zdwl_ipc_manager_v2* manager) {
+  if (manager == nullptr) {
+    return;
+  }
+  // Mango exposes dwl-ipc for legacy clients; workspace state comes from Mango socket IPC only.
+  if (compositors::detect() == compositors::CompositorKind::Mango) {
+    if (m_dwlIpcBackend != nullptr) {
+      m_dwlIpcBackend->cleanup();
+    }
+    zdwl_ipc_manager_v2_release(manager);
+    return;
+  }
   if (m_dwlIpcWorkspaceBinder != nullptr) {
     m_dwlIpcWorkspaceBinder->bindDwlIpcWorkspace(manager);
+  } else {
+    zdwl_ipc_manager_v2_release(manager);
   }
 }
 

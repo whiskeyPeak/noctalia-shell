@@ -75,7 +75,6 @@ private:
   [[nodiscard]] static std::optional<std::size_t> parseTagIndex(const std::string& id);
   [[nodiscard]] std::size_t protocolIndexForDisplay(std::size_t displayIndex) const;
   [[nodiscard]] static Workspace makeWorkspace(std::size_t index, const TagInfo& tag);
-  [[nodiscard]] std::string summarizeTags(const OutputState& state) const;
   void notifyChanged();
 
   zdwl_ipc_manager_v2* m_manager = nullptr;

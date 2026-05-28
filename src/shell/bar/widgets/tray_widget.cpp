@@ -332,12 +332,6 @@ void TrayWidget::syncState(Renderer& renderer) {
         || prev.attentionWidth != item.attentionWidth
         || prev.attentionHeight != item.attentionHeight
         || prev.attentionArgb32 != item.attentionArgb32) {
-      kLog.debug(
-          "tray widget invalidate icon cache id={} icon='{}'->'{}' overlay='{}'->'{}' attention='{}'->'{}' "
-          "status={}=>{}",
-          item.id, prev.iconName, item.iconName, prev.overlayIconName, item.overlayIconName, prev.attentionIconName,
-          item.attentionIconName, prev.status, item.status
-      );
       m_preferredIconPaths.erase(item.id);
     }
   }
@@ -862,12 +856,6 @@ std::string TrayWidget::resolveIconPath(const TrayItemInfo& item) {
     }
   }
 
-  kLog.debug(
-      "tray widget resolve id={} fallback={} preferred='{}' itemName='{}' title='{}' bus='{}' objectPath='{}' "
-      "stableBus='{}' stableId='{}'",
-      item.id, symbolicFallback, preferred, item.itemName, item.title, item.busName, item.objectPath, stableBusName,
-      stableItemId
-  );
   return symbolicFallback;
 }
 

@@ -1840,16 +1840,6 @@ void TrayService::refreshItemMetadata(const std::string& itemId) {
           }
 
           currentItemIt->second = std::move(next);
-          kLog.debug(
-              "tray metadata updated id={} status={} itemName='{}' title='{}' sniTitle='{}' icon='{}' "
-              "overlay='{}' attention='{}' pixmap={}x{} overlay={}x{} attention={}x{}",
-              itemId, currentItemIt->second.status, currentItemIt->second.itemName, currentItemIt->second.title,
-              currentItemIt->second.statusNotifierTitle, currentItemIt->second.iconName,
-              currentItemIt->second.overlayIconName, currentItemIt->second.attentionIconName,
-              currentItemIt->second.iconWidth, currentItemIt->second.iconHeight, currentItemIt->second.overlayWidth,
-              currentItemIt->second.overlayHeight, currentItemIt->second.attentionWidth,
-              currentItemIt->second.attentionHeight
-          );
           ensureMenuCache(itemId, currentItemIt->second.busName, currentItemIt->second.menuObjectPath);
           emitChanged();
         });

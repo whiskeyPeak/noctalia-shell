@@ -1,6 +1,5 @@
 #include "compositors/dwl/dwl_workspace_backend.h"
 
-#include "core/log.h"
 #include "dwl-ipc-unstable-v2-client-protocol.h"
 #include "util/string_utils.h"
 
@@ -11,8 +10,6 @@
 #include <utility>
 
 namespace {
-
-  constexpr Logger kLog("workspace_dwl");
 
   void managerTags(void* data, zdwl_ipc_manager_v2* /*manager*/, std::uint32_t amount) {
     static_cast<DwlWorkspaceBackend*>(data)->onTagCount(amount);
@@ -129,10 +126,6 @@ void DwlWorkspaceBackend::activateForOutput(wl_output* output, const std::string
 
   const std::size_t protocolIndex = protocolIndexForDisplay(*displayIndex);
   zdwl_ipc_output_v2_set_tags(it->second.handle, 1u << protocolIndex, 0);
-  kLog.debug(
-      "activate request display_tag={} protocol_tag={} output={} snapshot={}", *displayIndex + 1, protocolIndex + 1,
-      static_cast<const void*>(output), summarizeTags(it->second)
-  );
 }
 
 void DwlWorkspaceBackend::activateForOutput(wl_output* output, const Workspace& workspace) {
@@ -277,11 +270,6 @@ void DwlWorkspaceBackend::onOutputTag(
   tagInfo.active = (stateValue & ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE) != 0;
   tagInfo.urgent = (stateValue & ZDWL_IPC_OUTPUT_V2_TAG_STATE_URGENT) != 0;
   tagInfo.occupied = clients > 0;
-  kLog.debug(
-      "tag event output={} protocol_tag={} active={} urgent={} occupied={} total_tags={} snapshot={}",
-      static_cast<const void*>(output->second.output), tag + 1, tagInfo.active ? "yes" : "no",
-      tagInfo.urgent ? "yes" : "no", tagInfo.occupied ? "yes" : "no", m_tagCount, summarizeTags(output->second)
-  );
 }
 
 void DwlWorkspaceBackend::onOutputFrame(zdwl_ipc_output_v2* handle) {
@@ -309,10 +297,6 @@ void DwlWorkspaceBackend::onOutputFrame(zdwl_ipc_output_v2* handle) {
         state.appId = std::move(state.pendingAppId);
         state.hasPendingAppId = false;
       }
-      kLog.debug(
-          "frame output={} total_tags={} snapshot={}", static_cast<const void*>(state.output), m_tagCount,
-          summarizeTags(state)
-      );
     }
   }
   notifyChanged();
@@ -395,29 +379,6 @@ Workspace DwlWorkspaceBackend::makeWorkspace(std::size_t index, const TagInfo& t
       .urgent = tag.urgent,
       .occupied = tag.occupied,
   };
-}
-
-std::string DwlWorkspaceBackend::summarizeTags(const OutputState& state) const {
-  if (state.tags.empty()) {
-    return "[]";
-  }
-
-  std::string out;
-  out.reserve(state.tags.size() * 10);
-  out += '[';
-  for (std::size_t displayIndex = 0; displayIndex < state.tags.size(); ++displayIndex) {
-    const std::size_t protocolIndex = protocolIndexForDisplay(displayIndex);
-    const auto& tag = state.tags[protocolIndex];
-    if (displayIndex > 0) {
-      out += ' ';
-    }
-    out += std::to_string(displayIndex + 1);
-    out += "->";
-    out += std::to_string(protocolIndex + 1);
-    out += tag.active ? "*" : ".";
-  }
-  out += ']';
-  return out;
 }
 
 void DwlWorkspaceBackend::notifyChanged() {

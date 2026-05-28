@@ -447,18 +447,6 @@ namespace {
     return true;
   }
 
-  void logProgramStreamMetadata(std::string_view phase, std::uint32_t id, const PipeWireService::NodeData& nd) {
-    if (!isProgramStreamClass(nd.mediaClass)) {
-      return;
-    }
-    kLog.debug(
-        "[program-stream] {} id={} clientId={} class='{}' linkGroup='{}' appName='{}' appId='{}' appBinary='{}' "
-        "streamTitle='{}' icon='{}' nodeName='{}' nodeDesc='{}'",
-        phase, id, nd.clientId, nd.mediaClass, nd.linkGroup, nd.applicationName, nd.applicationId, nd.applicationBinary,
-        nd.streamTitle, nd.iconName, nd.name, nd.description
-    );
-  }
-
 } // namespace
 
 PipeWireService::PipeWireService() {
@@ -744,7 +732,6 @@ void PipeWireService::onRegistryGlobal(std::uint32_t id, const char* type, std::
     const bool audioDeviceNode = mediaClass == "Audio/Sink" || mediaClass == "Audio/Source";
     applyVolumePropsFromDict(*nd, props, !audioDeviceNode);
     refreshNodeIdentity(*nd);
-    logProgramStreamMetadata("registry-global", id, *nd);
 
     // Bind to the node to receive param updates
     auto* proxy = static_cast<pw_node*>(pw_registry_bind(m_registry, id, type, PW_VERSION_NODE, sizeof(void*)));
@@ -928,7 +915,6 @@ void PipeWireService::onNodeInfo(std::uint32_t id, const pw_node_info* info) {
     const bool audioDevice = nd.mediaClass == "Audio/Sink" || nd.mediaClass == "Audio/Source";
     applyVolumePropsFromDict(nd, info->props, !audioDevice);
     refreshNodeIdentity(nd);
-    logProgramStreamMetadata("node-info", id, nd);
 
     if (nd.linkGroup != oldLinkGroup || nd.targetObject != oldTargetObject || nd.nodePassive != oldNodePassive) {
       rebuildState();
