@@ -1,5 +1,6 @@
 #include "config/config_types.h"
 
+#include "render/core/color.h"
 #include "util/string_utils.h"
 #include "wayland/wayland_connection.h"
 
@@ -7,6 +8,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <stdexcept>
 #include <utility>
 #include <xkbcommon/xkbcommon-keysyms.h>
@@ -334,10 +336,6 @@ WidgetBarCapsuleSpec resolveWidgetBarCapsuleSpec(const BarConfig& bar, const Wid
     return spec;
   }
 
-  if (widget != nullptr && widget->hasSetting("capsule_group")) {
-    spec.group = StringUtils::trim(widget->getString("capsule_group", ""));
-  }
-
   if (widgetHasFillKey) {
     spec.fill = widget->getColorSpec("capsule_fill", bar.widgetCapsuleFill, "widget.capsule_fill");
   } else {
@@ -360,6 +358,44 @@ WidgetBarCapsuleSpec resolveWidgetBarCapsuleSpec(const BarConfig& bar, const Wid
     spec.foreground = std::nullopt;
   }
   return spec;
+}
+
+const BarCapsuleGroupStyle* findBarCapsuleGroupStyle(const BarConfig& bar, const std::string& id) {
+  if (id.empty()) {
+    return nullptr;
+  }
+  for (const auto& group : bar.widgetCapsuleGroups) {
+    if (group.id == id) {
+      return &group;
+    }
+  }
+  return nullptr;
+}
+
+WidgetBarCapsuleSpec capsuleSpecFromGroup(const BarCapsuleGroupStyle& group) {
+  WidgetBarCapsuleSpec spec;
+  spec.enabled = true;
+  spec.group = group.id;
+  spec.fill = group.fill;
+  spec.border = group.borderSpecified ? group.border : std::nullopt;
+  spec.foreground = group.foreground;
+  spec.padding = group.padding;
+  spec.radius = group.radius;
+  spec.opacity = group.opacity;
+  return spec;
+}
+
+bool isCapsuleGroupToken(std::string_view laneEntry) { return laneEntry.starts_with(kCapsuleGroupTokenPrefix); }
+
+std::string capsuleGroupTokenId(std::string_view laneEntry) {
+  if (!isCapsuleGroupToken(laneEntry)) {
+    return {};
+  }
+  return std::string(laneEntry.substr(kCapsuleGroupTokenPrefix.size()));
+}
+
+std::string makeCapsuleGroupToken(std::string_view groupId) {
+  return std::string(kCapsuleGroupTokenPrefix) + std::string(groupId);
 }
 
 float resolveWidgetContentScale(float barScale, const WidgetConfig* widget, std::string_view context) {
@@ -389,6 +425,31 @@ float resolveWidgetContentScale(float barScale, const WidgetConfig* widget, std:
 
 ColorSpec colorSpecFromConfigString(const std::string& raw, std::string_view context) {
   return parseColorSpecString(raw, context);
+}
+
+namespace {
+  int colorByteForExport(float value) { return static_cast<int>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f)); }
+
+  std::string colorToConfigString(const Color& color) {
+    if (color.a >= 0.999f) {
+      return formatRgbHex(color);
+    }
+    char buffer[16];
+    std::snprintf(
+        buffer, sizeof(buffer), "#%02X%02X%02X%02X", colorByteForExport(color.r), colorByteForExport(color.g),
+        colorByteForExport(color.b), colorByteForExport(color.a)
+    );
+    return std::string(buffer);
+  }
+} // namespace
+
+std::string colorSpecToConfigString(const ColorSpec& spec) {
+  if (spec.role.has_value()) {
+    return std::string(colorRoleToken(*spec.role));
+  }
+  Color color = spec.fixed;
+  color.a *= spec.alpha;
+  return colorToConfigString(color);
 }
 
 std::optional<HookKind> hookKindFromKey(std::string_view key) { return enumFromKey(kHookKinds, key); }

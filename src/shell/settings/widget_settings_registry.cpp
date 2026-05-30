@@ -503,14 +503,11 @@ namespace settings {
         withGroup(doubleSpec("capsule_opacity", 1.0, 0.0, 1.0, 0.01), WidgetSettingGroup::Presentation);
     capsuleOpacity.visibleWhen = capsuleOn;
 
-    auto capsuleGroup = withGroup(stringSpec("capsule_group"), WidgetSettingGroup::Grouping);
-    capsuleGroup.visibleWhen = capsuleOn;
-
     return {
         std::move(anchor),         std::move(scale),          std::move(widgetColor),
         std::move(fontWeight),     std::move(capsuleToggle),  std::move(capsuleRadius),
         std::move(capsuleFill),    std::move(capsuleBorder),  std::move(capsuleForeground),
-        std::move(capsulePadding), std::move(capsuleOpacity), std::move(capsuleGroup),
+        std::move(capsulePadding), std::move(capsuleOpacity),
     };
   }
 

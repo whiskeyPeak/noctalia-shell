@@ -1483,34 +1483,57 @@ void Bar::destroyInstance(std::uint32_t outputName) {
 void Bar::populateWidgets(BarInstance& instance) {
   const auto& widgetConfigs = m_config->config().widgets;
   const FontWeight labelFontWeight = static_cast<FontWeight>(instance.barConfig.fontWeight);
+  // Creates one widget for `name`. When `groupSpec` is set the widget is a member of a capsule group and
+  // takes the group's capsule style + foreground; otherwise it resolves its own per-widget/bar capsule.
+  auto createWidget = [&](const std::string& name, const WidgetBarCapsuleSpec* groupSpec,
+                          const std::optional<ColorSpec>* groupForeground, std::vector<std::unique_ptr<Widget>>& dest) {
+    const WidgetConfig* wcPtr = nullptr;
+    if (auto it = widgetConfigs.find(name); it != widgetConfigs.end()) {
+      wcPtr = &it->second;
+    }
+    const float contentScale = resolveWidgetContentScale(instance.barConfig.scale, wcPtr, "widget." + name + ".scale");
+    auto widget = m_widgetFactory->create(
+        name, instance.output, contentScale, instance.barConfig.position, instance.barConfig.name,
+        static_cast<float>(instance.barConfig.widgetSpacing)
+    );
+    if (widget == nullptr) {
+      return;
+    }
+    widget->setConfigName(name);
+    if (wcPtr != nullptr) {
+      widget->setAnchor(wcPtr->getBool("anchor", false));
+    }
+    widget->setBarCapsuleSpec(
+        groupSpec != nullptr ? *groupSpec : resolveWidgetBarCapsuleSpec(instance.barConfig, wcPtr)
+    );
+    widget->setLabelFontWeight(
+        wcPtr != nullptr ? parseWidgetLabelFontWeight(*wcPtr, labelFontWeight) : labelFontWeight
+    );
+    if (wcPtr != nullptr && wcPtr->hasSetting("color")) {
+      widget->setWidgetForeground(wcPtr->getOptionalColorSpec("color", "widget." + name + ".color"));
+    } else if (groupForeground != nullptr && groupForeground->has_value()) {
+      widget->setWidgetForeground(**groupForeground);
+    } else if (instance.barConfig.widgetColor.has_value()) {
+      widget->setWidgetForeground(*instance.barConfig.widgetColor);
+    }
+    dest.push_back(std::move(widget));
+  };
+
+  // Expands a lane's entries: group tokens become contiguous member widgets sharing the group's capsule.
   auto createWidgets = [&](const std::vector<std::string>& names, std::vector<std::unique_ptr<Widget>>& dest) {
     for (const auto& name : names) {
-      const WidgetConfig* wcPtr = nullptr;
-      if (auto it = widgetConfigs.find(name); it != widgetConfigs.end()) {
-        wcPtr = &it->second;
-      }
-      const float contentScale =
-          resolveWidgetContentScale(instance.barConfig.scale, wcPtr, "widget." + name + ".scale");
-      auto widget = m_widgetFactory->create(
-          name, instance.output, contentScale, instance.barConfig.position, instance.barConfig.name,
-          static_cast<float>(instance.barConfig.widgetSpacing)
-      );
-      if (widget != nullptr) {
-        widget->setConfigName(name);
-        if (wcPtr != nullptr) {
-          widget->setAnchor(wcPtr->getBool("anchor", false));
+      if (isCapsuleGroupToken(name)) {
+        const BarCapsuleGroupStyle* group = findBarCapsuleGroupStyle(instance.barConfig, capsuleGroupTokenId(name));
+        if (group == nullptr) {
+          continue;
         }
-        widget->setBarCapsuleSpec(resolveWidgetBarCapsuleSpec(instance.barConfig, wcPtr));
-        widget->setLabelFontWeight(
-            wcPtr != nullptr ? parseWidgetLabelFontWeight(*wcPtr, labelFontWeight) : labelFontWeight
-        );
-        if (wcPtr != nullptr && wcPtr->hasSetting("color")) {
-          widget->setWidgetForeground(wcPtr->getOptionalColorSpec("color", "widget." + name + ".color"));
-        } else if (instance.barConfig.widgetColor.has_value()) {
-          widget->setWidgetForeground(*instance.barConfig.widgetColor);
+        const WidgetBarCapsuleSpec groupSpec = capsuleSpecFromGroup(*group);
+        for (const auto& member : group->members) {
+          createWidget(member, &groupSpec, &group->foreground, dest);
         }
-        dest.push_back(std::move(widget));
+        continue;
       }
+      createWidget(name, nullptr, nullptr, dest);
     }
   };
 
@@ -1655,21 +1678,17 @@ void Bar::attachWidgetsToSections(BarInstance& instance) {
       }
     };
 
+    // Members of the same group share one resolved style by construction (see resolveWidgetBarCapsuleSpec),
+    // so adjacency + matching group ID + equal content scale is sufficient to merge.
     auto canJoinCapsuleGroup = [](const Widget& first, const Widget& next) {
       const auto& firstSpec = first.barCapsuleSpec();
       const auto& nextSpec = next.barCapsuleSpec();
-      const bool sameCapsuleStyle = firstSpec.fill == nextSpec.fill
-          && firstSpec.group == nextSpec.group
-          && firstSpec.border == nextSpec.border
-          && firstSpec.foreground == nextSpec.foreground
-          && firstSpec.radius == nextSpec.radius
-          && firstSpec.opacity == nextSpec.opacity;
       return firstSpec.enabled
           && nextSpec.enabled
           && !first.isAnchor()
           && !next.isAnchor()
           && !firstSpec.group.empty()
-          && sameCapsuleStyle
+          && firstSpec.group == nextSpec.group
           && first.contentScale() == next.contentScale();
     };
 
@@ -1748,7 +1767,6 @@ void Bar::attachWidgetsToSections(BarInstance& instance) {
 
       for (std::size_t memberIndex = index; memberIndex < runEnd; ++memberIndex) {
         auto& member = widgets[memberIndex];
-        run.spec.padding = std::max(run.spec.padding, member->barCapsuleSpec().padding);
         member->setBarCapsuleScene(shellPtr, bgPtr);
         run.widgets.push_back(member.get());
         auto* added = innerPtr->addChild(member->releaseRoot());

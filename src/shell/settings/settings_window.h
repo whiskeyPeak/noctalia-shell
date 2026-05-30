@@ -172,6 +172,8 @@ private:
   Node* m_pendingContentScrollTarget = nullptr;
   std::string m_searchQuery;
   std::string m_editingWidgetName;
+  std::string m_editingCapsuleGroupId;
+  std::vector<std::string> m_selectedLaneWidgets;
   std::string m_pendingDeleteWidgetName;
   std::string m_pendingDeleteWidgetSettingPath;
   std::string m_renamingWidgetName;

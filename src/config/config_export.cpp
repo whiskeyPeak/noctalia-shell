@@ -1,10 +1,8 @@
 #include "config/config_export.h"
 
 #include "core/key_chord.h"
-#include "render/core/color.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -16,33 +14,6 @@
 
 namespace config_export {
   namespace {
-
-    int colorByteForExport(float value) {
-      return static_cast<int>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f));
-    }
-
-    std::string colorToConfigString(const Color& color) {
-      if (color.a >= 0.999f) {
-        return formatRgbHex(color);
-      }
-
-      char buffer[16];
-      std::snprintf(
-          buffer, sizeof(buffer), "#%02X%02X%02X%02X", colorByteForExport(color.r), colorByteForExport(color.g),
-          colorByteForExport(color.b), colorByteForExport(color.a)
-      );
-      return std::string(buffer);
-    }
-
-    std::string colorSpecToConfigString(const ColorSpec& spec) {
-      if (spec.role.has_value()) {
-        return std::string(colorRoleToken(*spec.role));
-      }
-
-      Color color = spec.fixed;
-      color.a *= spec.alpha;
-      return colorToConfigString(color);
-    }
 
     toml::array stringArray(const std::vector<std::string>& values) {
       toml::array array;
@@ -138,6 +109,34 @@ namespace config_export {
       return array;
     }
 
+    toml::array capsuleGroupArray(const std::vector<BarCapsuleGroupStyle>& groups) {
+      toml::array array;
+      for (const auto& group : groups) {
+        if (group.id.empty()) {
+          continue;
+        }
+        toml::table item;
+        item.insert_or_assign("id", group.id);
+        item.insert_or_assign("members", stringArray(group.members));
+        item.insert_or_assign("fill", colorSpecToConfigString(group.fill));
+        if (group.borderSpecified) {
+          item.insert_or_assign(
+              "border", group.border.has_value() ? colorSpecToConfigString(*group.border) : std::string{}
+          );
+        }
+        if (group.foreground.has_value()) {
+          item.insert_or_assign("foreground", colorSpecToConfigString(*group.foreground));
+        }
+        item.insert_or_assign("padding", static_cast<double>(group.padding));
+        if (group.radius.has_value()) {
+          item.insert_or_assign("radius", static_cast<double>(*group.radius));
+        }
+        item.insert_or_assign("opacity", static_cast<double>(group.opacity));
+        array.push_back(std::move(item));
+      }
+      return array;
+    }
+
     toml::array wallpaperTransitionArray(const std::vector<WallpaperTransition>& transitions) {
       toml::array array;
       for (const auto transition : transitions) {
@@ -185,7 +184,7 @@ namespace config_export {
       if (bar.widgetColor.has_value()) {
         table.insert_or_assign("color", colorSpecToConfigString(*bar.widgetColor));
       }
-      table.insert_or_assign("capsule_groups", stringArray(bar.widgetCapsuleGroups));
+      table.insert_or_assign("capsule_group", capsuleGroupArray(bar.widgetCapsuleGroups));
       table.insert_or_assign("capsule_padding", static_cast<double>(bar.widgetCapsulePadding));
       if (bar.widgetCapsuleRadius.has_value()) {
         table.insert_or_assign("capsule_radius", *bar.widgetCapsuleRadius);

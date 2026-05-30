@@ -392,6 +392,8 @@ settings::SettingsContentContext SettingsWindow::makeContentContext(
       .showOverriddenOnly = m_showOverriddenOnly,
       .batteryDeviceOptions = batteryDeviceOptions(),
       .editingWidgetName = m_editingWidgetName,
+      .editingCapsuleGroupId = m_editingCapsuleGroupId,
+      .selectedLaneWidgets = m_selectedLaneWidgets,
       .pendingDeleteWidgetName = m_pendingDeleteWidgetName,
       .pendingDeleteWidgetSettingPath = m_pendingDeleteWidgetSettingPath,
       .renamingWidgetName = m_renamingWidgetName,

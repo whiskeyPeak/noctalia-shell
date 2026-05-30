@@ -373,6 +373,49 @@ namespace {
     return colorSpecFromConfigString(raw, context);
   }
 
+  // Parses a `[[bar.*.capsule_group]]` array-of-tables into shared group styles. Rows without an `id` are skipped.
+  std::vector<BarCapsuleGroupStyle> readCapsuleGroupArray(const toml::array& array, const std::string& context) {
+    std::vector<BarCapsuleGroupStyle> groups;
+    for (const auto& node : array) {
+      const auto* row = node.as_table();
+      if (row == nullptr) {
+        continue;
+      }
+      auto id = (*row)["id"].value<std::string>();
+      if (!id.has_value() || StringUtils::trim(*id).empty()) {
+        continue;
+      }
+      BarCapsuleGroupStyle group;
+      group.id = StringUtils::trim(*id);
+      const std::string rowContext = context + "." + group.id;
+      if (auto* members = (*row)["members"].as_array()) {
+        group.members = readStringArray(*members);
+      }
+      if (auto fillStr = colorStringValue(*row, "fill", rowContext + ".fill")) {
+        group.fill = colorSpecFromConfigString(*fillStr, rowContext + ".fill");
+      }
+      if (row->contains("border")) {
+        group.borderSpecified = true;
+        group.border =
+            optionalCapsuleBorder(*colorStringValue(*row, "border", rowContext + ".border"), rowContext + ".border");
+      }
+      if (auto fgStr = colorStringValue(*row, "foreground", rowContext + ".foreground")) {
+        group.foreground = colorSpecFromConfigString(*fgStr, rowContext + ".foreground");
+      }
+      if (auto v = finiteDouble((*row)["padding"])) {
+        group.padding = std::clamp(static_cast<float>(*v), 0.0f, 48.0f);
+      }
+      if (auto v = finiteDouble((*row)["radius"])) {
+        group.radius = std::clamp(static_cast<float>(*v), 0.0f, 80.0f);
+      }
+      if (auto v = finiteDouble((*row)["opacity"])) {
+        group.opacity = std::clamp(static_cast<float>(*v), 0.0f, 1.0f);
+      }
+      groups.push_back(std::move(group));
+    }
+    return groups;
+  }
+
 } // namespace
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -1219,8 +1262,8 @@ void ConfigService::parseTableInto(const toml::table& tbl, Config& config, bool 
       if (auto widgetColorStr = colorStringValue(*barTbl, "color", "bar." + bar.name + ".color")) {
         bar.widgetColor = colorSpecFromConfigString(*widgetColorStr, "bar." + bar.name + ".color");
       }
-      if (auto* n = (*barTbl)["capsule_groups"].as_array()) {
-        bar.widgetCapsuleGroups = readStringArray(*n);
+      if (auto* n = (*barTbl)["capsule_group"].as_array()) {
+        bar.widgetCapsuleGroups = readCapsuleGroupArray(*n, "bar." + bar.name + ".capsule_group");
       }
 
       // Parse [bar.<name>.monitor.*] overrides — insertion order preserved by toml++
@@ -1316,8 +1359,8 @@ void ConfigService::parseTableInto(const toml::table& tbl, Config& config, bool 
           if (auto cStr = colorStringValue(*monTbl, "color", monitorContext + ".color")) {
             ovr.widgetColor = colorSpecFromConfigString(*cStr, monitorContext + ".color");
           }
-          if (auto* n = (*monTbl)["capsule_groups"].as_array()) {
-            ovr.widgetCapsuleGroups = readStringArray(*n);
+          if (auto* n = (*monTbl)["capsule_group"].as_array()) {
+            ovr.widgetCapsuleGroups = readCapsuleGroupArray(*n, monitorContext + ".capsule_group");
           }
 
           bar.monitorOverrides.push_back(std::move(ovr));

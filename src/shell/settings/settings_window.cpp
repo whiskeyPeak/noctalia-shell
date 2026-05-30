@@ -642,6 +642,8 @@ void SettingsWindow::onKeyboardEvent(const KeyboardEvent& event) {
       return;
     }
     if (!m_editingWidgetName.empty()
+        || !m_editingCapsuleGroupId.empty()
+        || !m_selectedLaneWidgets.empty()
         || !m_renamingWidgetName.empty()
         || !m_pendingDeleteWidgetName.empty()
         || !m_pendingDeleteWidgetSettingPath.empty()
@@ -652,6 +654,8 @@ void SettingsWindow::onKeyboardEvent(const KeyboardEvent& event) {
         || !m_renamingMonitorOverrideBarName.empty()
         || !m_pendingDeleteMonitorOverrideBarName.empty()) {
       m_editingWidgetName.clear();
+      m_editingCapsuleGroupId.clear();
+      m_selectedLaneWidgets.clear();
       m_renamingWidgetName.clear();
       m_pendingDeleteWidgetName.clear();
       m_pendingDeleteWidgetSettingPath.clear();

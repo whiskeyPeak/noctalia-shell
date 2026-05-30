@@ -389,6 +389,36 @@ namespace {
               array.push_back(std::move(row));
             }
             table.insert_or_assign(key, std::move(array));
+          } else if constexpr (std::is_same_v<T, std::vector<BarCapsuleGroupStyle>>) {
+            toml::array array;
+            for (const auto& item : concrete) {
+              if (item.id.empty()) {
+                continue;
+              }
+              toml::table row;
+              row.insert_or_assign("id", item.id);
+              toml::array members;
+              for (const auto& member : item.members) {
+                members.push_back(member);
+              }
+              row.insert_or_assign("members", std::move(members));
+              row.insert_or_assign("fill", colorSpecToConfigString(item.fill));
+              if (item.borderSpecified) {
+                row.insert_or_assign(
+                    "border", item.border.has_value() ? colorSpecToConfigString(*item.border) : std::string{}
+                );
+              }
+              if (item.foreground.has_value()) {
+                row.insert_or_assign("foreground", colorSpecToConfigString(*item.foreground));
+              }
+              row.insert_or_assign("padding", static_cast<double>(item.padding));
+              if (item.radius.has_value()) {
+                row.insert_or_assign("radius", static_cast<double>(*item.radius));
+              }
+              row.insert_or_assign("opacity", static_cast<double>(item.opacity));
+              array.push_back(std::move(row));
+            }
+            table.insert_or_assign(key, std::move(array));
           } else if constexpr (std::is_same_v<T, std::vector<IdleBehaviorConfig>>) {
             toml::table behaviorTable;
             toml::array behaviorOrder;

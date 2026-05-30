@@ -37,6 +37,8 @@ namespace settings {
     std::vector<SelectOption> batteryDeviceOptions;
 
     std::string& editingWidgetName;
+    std::string& editingCapsuleGroupId;
+    std::vector<std::string>& selectedLaneWidgets;
     std::string& pendingDeleteWidgetName;
     std::string& pendingDeleteWidgetSettingPath;
     std::string& renamingWidgetName;

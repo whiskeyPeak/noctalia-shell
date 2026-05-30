@@ -1921,15 +1921,6 @@ namespace settings {
       }
       {
         auto e = makeEntry(
-            section, "capsules", tr("settings.schema.bar.capsule-groups.label"),
-            tr("settings.schema.bar.capsule-groups.description"), path("capsule_groups"),
-            ListSetting{.items = bar.widgetCapsuleGroups}, "grouped capsules"
-        );
-        e.visibleWhen = capsuleOn;
-        entries.push_back(std::move(e));
-      }
-      {
-        auto e = makeEntry(
             section, "capsules", tr("settings.schema.bar.capsule-fill.label"),
             tr("settings.schema.bar.capsule-fill.description"), path("capsule_fill"),
             colorSpecPicker(bar.widgetCapsuleFill), "color pill", true
@@ -2138,15 +2129,6 @@ namespace settings {
               },
               "pill rounded radius", true
           );
-          entries.push_back(std::move(e));
-        }
-        {
-          auto e = makeEntry(
-              section, "capsules", tr("settings.schema.bar.capsule-groups.label"),
-              tr("settings.schema.bar.capsule-groups.description"), monitorPath("capsule_groups"),
-              ListSetting{.items = ovr.widgetCapsuleGroups.value_or(bar.widgetCapsuleGroups)}, "grouped capsules"
-          );
-          e.visibleWhen = monitorCapsuleOn;
           entries.push_back(std::move(e));
         }
         {

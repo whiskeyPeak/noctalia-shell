@@ -16,6 +16,31 @@
 
 struct WaylandOutput;
 
+// A capsule group: an ordered set of member widgets sharing one capsule + style. `id` is opaque and
+// auto-generated. A group appears in a bar lane as a single token (see makeCapsuleGroupToken); its
+// members live inside the group, not loose in the lane.
+struct BarCapsuleGroupStyle {
+  std::string id;
+  std::vector<std::string> members; // ordered member widget references
+  ColorSpec fill = colorSpecFromRole(ColorRole::SurfaceVariant);
+  // True when `border` is explicitly present (empty value = no outline); mirrors bar/widget border semantics.
+  bool borderSpecified = false;
+  std::optional<ColorSpec> border;
+  std::optional<ColorSpec> foreground;
+  float padding = Style::barCapsulePadding;
+  std::optional<float> radius;
+  float opacity = 1.0f;
+
+  bool operator==(const BarCapsuleGroupStyle&) const = default;
+};
+
+// A lane entry referencing a capsule group is the literal "group:" prefix + the group id. The colon
+// cannot appear in a widget instance id, so group tokens never collide with widget references.
+inline constexpr std::string_view kCapsuleGroupTokenPrefix = "group:";
+[[nodiscard]] bool isCapsuleGroupToken(std::string_view laneEntry);
+[[nodiscard]] std::string capsuleGroupTokenId(std::string_view laneEntry);
+[[nodiscard]] std::string makeCapsuleGroupToken(std::string_view groupId);
+
 struct BarMonitorOverride {
   std::string match;
   std::optional<std::string> position;
@@ -48,7 +73,7 @@ struct BarMonitorOverride {
   std::optional<ColorSpec> widgetCapsuleBorder;
   std::optional<ColorSpec> widgetCapsuleForeground;
   std::optional<ColorSpec> widgetColor;
-  std::optional<std::vector<std::string>> widgetCapsuleGroups;
+  std::optional<std::vector<BarCapsuleGroupStyle>> widgetCapsuleGroups;
   std::optional<double> widgetCapsulePadding;
   std::optional<double> widgetCapsuleRadius;
   std::optional<double> widgetCapsuleOpacity;
@@ -97,7 +122,7 @@ struct BarConfig {
   // Default icon + primary label color for all widgets on this bar (same as per-widget `color`); per-widget `color`
   // overrides.
   std::optional<ColorSpec> widgetColor;
-  std::vector<std::string> widgetCapsuleGroups;
+  std::vector<BarCapsuleGroupStyle> widgetCapsuleGroups;
   // Inner padding between capsule edge and widget content (logical px), multiplied by widget content scale on the bar.
   float widgetCapsulePadding = Style::barCapsulePadding;
   // Capsule corner radius in logical pixels before content-scale; unset means automatic pill radius.
@@ -215,14 +240,16 @@ enum class KeybindAction : std::uint8_t {
 using WidgetSettingValue = std::variant<bool, std::int64_t, double, std::string, std::vector<std::string>>;
 using ConfigOverrideValue = std::variant<
     bool, std::int64_t, double, std::string, std::vector<std::string>, std::vector<ShortcutConfig>,
-    std::vector<SessionPanelActionConfig>, std::vector<IdleBehaviorConfig>, std::vector<KeyChord>>;
+    std::vector<SessionPanelActionConfig>, std::vector<IdleBehaviorConfig>, std::vector<KeyChord>,
+    std::vector<BarCapsuleGroupStyle>>;
 
 // Optional rounded “capsule” behind a bar widget (see `[widget.*] capsule_*` in CONFIG.md).
 // Corner shape, border width, and edge softness are fixed in the shell code; padding/radius are configurable.
 struct WidgetBarCapsuleSpec {
   bool enabled = false;
   ColorSpec fill = colorSpecFromRole(ColorRole::SurfaceVariant);
-  // Adjacent widgets in the same section with the same non-empty group and identical capsule styling share one shell.
+  // Opaque group ID (auto-generated). Adjacent widgets in the same section with the same non-empty ID share one
+  // shell and inherit the group's `BarCapsuleGroupStyle`.
   std::string group;
   // Set only when `capsule_border` is present and non-empty in config; otherwise no outline.
   std::optional<ColorSpec> border;
@@ -260,11 +287,20 @@ struct WidgetConfig {
 // Merges `[bar.*]` capsule defaults with `[widget.*]` overrides (see CONFIG.md). Size/style fields such as
 // `radius` are populated even when `enabled` is false so widgets can reuse capsule styling internally.
 [[nodiscard]] WidgetBarCapsuleSpec resolveWidgetBarCapsuleSpec(const BarConfig& bar, const WidgetConfig* widget);
+
+// Returns the group for `id` on this bar, or nullptr if `id` is empty or unregistered.
+[[nodiscard]] const BarCapsuleGroupStyle* findBarCapsuleGroupStyle(const BarConfig& bar, const std::string& id);
+
+// Builds the capsule spec a group's member widgets render with (style taken from the group).
+[[nodiscard]] WidgetBarCapsuleSpec capsuleSpecFromGroup(const BarCapsuleGroupStyle& group);
 [[nodiscard]] float
 resolveWidgetContentScale(float barScale, const WidgetConfig* widget, std::string_view context = "widget.scale");
 
 // Color spec for user color strings: either a palette color role token or a hex color.
 [[nodiscard]] ColorSpec colorSpecFromConfigString(const std::string& raw, std::string_view context = {});
+
+// Serializes a color spec back to its config string form (palette role token or hex).
+[[nodiscard]] std::string colorSpecToConfigString(const ColorSpec& spec);
 
 // Shared output selector matching used by monitor-scoped config and IPC selectors.
 // Matches connector name exactly, or a word-boundary token within output description.

@@ -872,6 +872,24 @@
           "title": "Bar Widgets",
           "description": "Arrange widgets across the bar lanes"
         },
+        "group": {
+          "title": "Capsule group",
+          "hint": "Part of a capsule group",
+          "orphan": "Unknown group",
+          "members": "{count} widgets",
+          "selected": "{count} selected",
+          "action": "Group",
+          "clear": "Clear",
+          "edit": "Edit style",
+          "ungroup": "Ungroup",
+          "fill": "Background",
+          "border": "Border",
+          "foreground": "Foreground",
+          "padding": "Padding",
+          "opacity": "Opacity",
+          "radius-auto": "Automatic radius",
+          "radius": "Radius"
+        },
         "settings": {
           "empty": "No settings match the current filters.",
           "groups": {
@@ -1215,10 +1233,6 @@
         "capsule": {
           "label": "Capsule",
           "description": "Draw a capsule behind this widget"
-        },
-        "capsule_group": {
-          "label": "Capsule Group",
-          "description": "Join nearby widgets with the same managed group"
         },
         "capsule_border": {
           "label": "Capsule Border",
@@ -2429,10 +2443,6 @@
         "widget-capsules": {
           "label": "Widget Capsules",
           "description": "Wrap widgets in capsule backgrounds"
-        },
-        "capsule-groups": {
-          "label": "Capsule Groups",
-          "description": "Create reusable groups for nearby widgets on this bar"
         },
         "widget-color": {
           "label": "Widget Color",
