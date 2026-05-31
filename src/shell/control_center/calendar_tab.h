@@ -16,9 +16,11 @@ public:
   explicit CalendarTab(ConfigService* config = nullptr, CalendarService* calendar = nullptr);
 
   std::unique_ptr<Flex> create() override;
+  void setActive(bool active) override;
   void onClose() override;
 
 private:
+  void resetToCurrentMonth();
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
   void rebuild();

@@ -328,6 +328,21 @@ void CalendarTab::doUpdate(Renderer& renderer) {
   }
 }
 
+void CalendarTab::setActive(bool active) {
+  if (!active) {
+    return;
+  }
+  resetToCurrentMonth();
+}
+
+void CalendarTab::resetToCurrentMonth() {
+  m_monthOffset = 0;
+  m_scrollAccum = 0.0f;
+  m_lastDisplayYear = std::numeric_limits<int>::min();
+  m_lastDisplayMonth = -1;
+  m_eventsDirty = true;
+}
+
 void CalendarTab::onClose() {
   m_rootLayout = nullptr;
   m_calendarArea = nullptr;
@@ -347,13 +362,10 @@ void CalendarTab::onClose() {
   m_selectedYear = std::numeric_limits<int>::min();
   m_selectedMonth = -1;
   m_selectedDay = -1;
+  resetToCurrentMonth();
   m_eventsDirty = false;
-  m_monthOffset = 0;
-  m_scrollAccum = 0.0f;
   m_lastInnerWidth = -1.0f;
   m_lastInnerHeight = -1.0f;
-  m_lastDisplayYear = std::numeric_limits<int>::min();
-  m_lastDisplayMonth = -1;
   m_lastCurrentYear = std::numeric_limits<int>::min();
   m_lastCurrentMonth = -1;
   m_lastToday = -1;
