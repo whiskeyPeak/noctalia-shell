@@ -94,6 +94,21 @@ namespace ui {
     return flex;
   }
 
+  std::unique_ptr<Node> node(NodeProps props) {
+    auto control = std::make_unique<Node>();
+    if (props.clipChildren.has_value()) {
+      control->setClipChildren(*props.clipChildren);
+    }
+    applyNodeProps(*control, props);
+    if (props.configure) {
+      props.configure(*control);
+    }
+    if (props.out != nullptr) {
+      *props.out = control.get();
+    }
+    return control;
+  }
+
   std::unique_ptr<Input> input(InputProps props) {
     auto control = std::make_unique<Input>();
     if (props.value.has_value()) {

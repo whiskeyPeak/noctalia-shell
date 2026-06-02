@@ -470,6 +470,7 @@ struct OsdConfig {
 
 struct NotificationConfig {
   bool enableDaemon = true;
+  bool showAppName = true;
   std::string position = "top_right";
   std::string layer = "top"; // top | overlay
   float scale = 1.0f;

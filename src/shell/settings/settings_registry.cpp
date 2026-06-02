@@ -1775,6 +1775,11 @@ namespace settings {
         ToggleSetting{cfg.notification.enableDaemon}, "dbus"
     ));
     entries.push_back(makeEntry(
+        "popups", "notifications", tr("settings.schema.notifications.show-app-name.label"),
+        tr("settings.schema.notifications.show-app-name.description"), {"notification", "show_app_name"},
+        ToggleSetting{cfg.notification.showAppName}, "application identity header"
+    ));
+    entries.push_back(makeEntry(
         "popups", "notifications", tr("settings.schema.notifications.layer.label"),
         tr("settings.schema.notifications.layer.description"), {"notification", "layer"},
         asSegmented(plainSelect(

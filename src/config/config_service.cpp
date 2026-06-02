@@ -2075,6 +2075,8 @@ void ConfigService::parseTableInto(const toml::table& tbl, Config& config, bool 
     auto& notif = config.notification;
     if (auto v = notifTable["enable_daemon"].value<bool>())
       notif.enableDaemon = *v;
+    if (auto v = notifTable["show_app_name"].value<bool>())
+      notif.showAppName = *v;
     if (auto v = notifTable["position"].value<std::string>())
       notif.position = *v;
     if (auto v = notifTable["layer"].value<std::string>())

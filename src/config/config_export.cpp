@@ -600,6 +600,7 @@ namespace config_export {
     toml::table notificationTable(const NotificationConfig& notification) {
       toml::table table;
       table.insert_or_assign("enable_daemon", notification.enableDaemon);
+      table.insert_or_assign("show_app_name", notification.showAppName);
       table.insert_or_assign("position", notification.position);
       table.insert_or_assign("layer", notification.layer);
       table.insert_or_assign("scale", static_cast<double>(notification.scale));

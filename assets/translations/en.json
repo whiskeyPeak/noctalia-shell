@@ -2375,6 +2375,10 @@
           "label": "Notification Daemon",
           "description": "Enable the built-in notification daemon"
         },
+        "show-app-name": {
+          "label": "Show App Name",
+          "description": "Show the sending application's name in notification toasts"
+        },
         "position": {
           "label": "Screen Position",
           "description": "Screen position for notification toasts"

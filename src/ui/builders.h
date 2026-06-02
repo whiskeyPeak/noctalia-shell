@@ -42,6 +42,18 @@ namespace ui {
 
   // out fields receive non-owning pointers into the returned subtree.
   // They are valid only while that subtree remains alive.
+  struct NodeProps {
+    Node** out = nullptr;
+    std::optional<float> width = std::nullopt;
+    std::optional<float> height = std::nullopt;
+    std::optional<float> flexGrow = std::nullopt;
+    std::optional<float> opacity = std::nullopt;
+    std::optional<bool> visible = std::nullopt;
+    std::optional<bool> participatesInLayout = std::nullopt;
+    std::optional<bool> clipChildren = std::nullopt;
+    std::function<void(Node&)> configure = nullptr;
+  };
+
   struct FlexProps {
     Flex** out = nullptr;
     std::optional<FlexAlign> align = std::nullopt;
@@ -506,6 +518,7 @@ namespace ui {
   [[nodiscard]] std::unique_ptr<Input> input(InputProps props);
   [[nodiscard]] std::unique_ptr<Button> button(ButtonProps props);
   [[nodiscard]] std::unique_ptr<Label> label(LabelProps props);
+  [[nodiscard]] std::unique_ptr<Node> node(NodeProps props = {});
   [[nodiscard]] std::unique_ptr<Box> box(BoxProps props = {});
   [[nodiscard]] std::unique_ptr<Glyph> glyph(GlyphProps props = {});
   [[nodiscard]] std::unique_ptr<Image> image(ImageProps props = {});
@@ -534,6 +547,12 @@ namespace ui {
 
   template <typename... Children> [[nodiscard]] std::unique_ptr<Flex> column(FlexProps props, Children&&... children) {
     auto container = flex(FlexDirection::Vertical, std::move(props));
+    (container->addChild(std::forward<Children>(children)), ...);
+    return container;
+  }
+
+  template <typename... Children> [[nodiscard]] std::unique_ptr<Node> node(NodeProps props, Children&&... children) {
+    auto container = node(std::move(props));
     (container->addChild(std::forward<Children>(children)), ...);
     return container;
   }

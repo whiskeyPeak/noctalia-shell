@@ -3,12 +3,7 @@
 #include "notification/notification_manager.h"
 #include "render/animation/animation_manager.h"
 #include "render/scene/input_dispatcher.h"
-#include "render/scene/node.h"
 #include "system/icon_resolver.h"
-#include "ui/controls/label.h"
-#include "ui/controls/progress_bar.h"
-#include "wayland/layer_surface.h"
-#include "wayland/surface.h"
 
 #include <memory>
 #include <unordered_map>
@@ -20,11 +15,15 @@ class Glyph;
 class HttpClient;
 class Input;
 class InputArea;
+class LayerSurface;
+class Node;
+class ProgressBar;
 class RenderContext;
 class WaylandConnection;
 struct KeyboardEvent;
 struct PointerEvent;
 struct WaylandOutput;
+struct wl_output;
 
 class NotificationToast {
 public:
@@ -67,17 +66,18 @@ private:
     float y = -1.0f; // stable top position while visible; negative = queued/off-screen
     float height = 0.0f;
     // Planned toast chrome (refreshEntryGeometry); buildCard must match these for placement vs paint.
-    int toastSummaryLines = 2;
     int toastBodyLines = 0;
     bool exiting = false;
     bool hovered = false; // pointer is currently over the card on some instance
+    int hoverOwners = 0;
+    std::uint64_t hoverResetToken = 0;
+    bool hoverResetPending = false;
     bool replyInputFocused = false;
   };
 
   // Per-output instance (each has its own surface, scene, animations)
   struct Instance {
     wl_output* output = nullptr;
-    std::int32_t scale = 1;
 
     std::unique_ptr<LayerSurface> surface;
     // Declaration order matters: sceneRoot must be destroyed before `animations`,
@@ -93,13 +93,7 @@ private:
       Node* cardNode = nullptr;
       Node* cardContent = nullptr;
       Node* cardForeground = nullptr;
-      Node* cardBg = nullptr;
-      Node* appIconNode = nullptr;
-      Label* appNameLabel = nullptr;
-      Label* summaryLabel = nullptr;
-      Label* bodyLabel = nullptr;
       ProgressBar* progressBar = nullptr;
-      Glyph* closeGlyph = nullptr;
       Node* actionsRowNode = nullptr;
       Node* inlineReplyRowNode = nullptr;
       Input* inlineReplyInput = nullptr;
@@ -134,8 +128,7 @@ private:
   void prepareFrame(Instance& inst, bool needsUpdate, bool needsLayout);
   void buildScene(Instance& inst, uint32_t width, uint32_t height);
   InputArea* buildCard(
-      const PopupEntry& entry, Node** outCardContent, Node** outCardForeground, Label** outAppName, Label** outSummary,
-      Label** outBody, Node** outBg, Node** outAppIcon, ProgressBar** outProgress, Glyph** outCloseGlyph,
+      const PopupEntry& entry, Node** outCardContent, Node** outCardForeground, ProgressBar** outProgress,
       Node** outActionsRow, Node** outInlineReplyRow, Input** outInlineReplyInput
   );
   void applyCardReveal(Instance::CardState& cs, float reveal, float y, float cardHeight) const;
@@ -147,6 +140,12 @@ private:
 
   PopupEntry* findEntry(uint32_t notificationId);
   Instance::CardState* findCardState(Instance& inst, uint32_t notificationId);
+  void beginPopupHover(uint32_t notificationId, const ProgressBar* progressBar = nullptr);
+  void endPopupHover(uint32_t notificationId, int totalDuration, const ProgressBar* progressBar = nullptr);
+  void resetPopupHover(uint32_t notificationId, int totalDuration, bool resumeTimer);
+  void resetInstanceHover(Instance& inst, bool resumeTimers);
+  void pauseTimeout(uint32_t notificationId, const ProgressBar* progressBar = nullptr);
+  void resumeTimeout(uint32_t notificationId, int totalDuration);
   void pauseCountdowns(uint32_t notificationId);
   void resumeCountdowns(uint32_t notificationId);
   void revealQueuedEntries();
@@ -156,7 +155,6 @@ private:
   [[nodiscard]] bool
   canKeepPlacement(const PopupEntry& entry, std::optional<uint32_t> ignoreNotificationId = std::nullopt) const;
   [[nodiscard]] bool fitsOnSurface(const PopupEntry& entry, float surfaceHeight) const;
-  [[nodiscard]] float entryHeight(const PopupEntry& entry) const;
   [[nodiscard]] std::string notificationPosition() const;
   [[nodiscard]] std::string notificationLayer() const;
   [[nodiscard]] std::vector<std::string> notificationMonitors() const;
