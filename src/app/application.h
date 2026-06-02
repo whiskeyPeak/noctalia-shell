@@ -75,6 +75,8 @@
 #include "system/desktop_entry_poll_source.h"
 #include "system/gamma_service.h"
 #include "system/icon_theme_poll_source.h"
+#include "system/location_poll_source.h"
+#include "system/location_service.h"
 #include "system/lock_keys_poll_source.h"
 #include "system/lock_keys_service.h"
 #include "system/screen_time_service.h"
@@ -237,10 +239,12 @@ private:
   std::unique_ptr<PolkitPollSource> m_polkitPollSource;
   IpcService m_ipcService;
   IpcPollSource m_ipcPollSource{m_ipcService};
+  LocationService m_locationService;
   WeatherService m_weatherService;
   CalendarService m_calendarService;
   HttpClientPollSource m_httpClientPollSource{m_httpClient};
   FileWatchPollSource m_fileWatchPollSource{m_fileWatcher};
+  LocationPollSource m_locationPollSource{m_locationService};
   WeatherPollSource m_weatherPollSource{m_weatherService};
   CalendarPollSource m_calendarPollSource{m_calendarService};
   Timer m_trayInitTimer;

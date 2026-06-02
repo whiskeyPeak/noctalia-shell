@@ -54,26 +54,26 @@ void GammaService::setEnabled(bool enabled) {
 
 void GammaService::toggleEnabled() { setEnabled(!enabled()); }
 
-void GammaService::setWeatherLocationConfigured(bool configured) {
-  if (m_weatherLocationConfigured == configured) {
+void GammaService::setLocationResolving(bool resolving) {
+  if (m_locationResolving == resolving) {
     return;
   }
-  m_weatherLocationConfigured = configured;
+  m_locationResolving = resolving;
   apply();
 }
 
-void GammaService::setWeatherCoordinates(std::optional<double> latitude, std::optional<double> longitude) {
+void GammaService::setResolvedCoordinates(std::optional<double> latitude, std::optional<double> longitude) {
   if (latitude.has_value() && !std::isfinite(*latitude)) {
     latitude.reset();
   }
   if (longitude.has_value() && !std::isfinite(*longitude)) {
     longitude.reset();
   }
-  if (m_weatherLatitude == latitude && m_weatherLongitude == longitude) {
+  if (m_resolvedLatitude == latitude && m_resolvedLongitude == longitude) {
     return;
   }
-  m_weatherLatitude = latitude;
-  m_weatherLongitude = longitude;
+  m_resolvedLatitude = latitude;
+  m_resolvedLongitude = longitude;
   apply();
 }
 
@@ -130,7 +130,7 @@ bool GammaService::effectiveForce() const {
 
 void GammaService::scheduleManualTimer() {
   const auto boundaryDelay =
-      day_night_schedule::evaluate(m_location, m_weatherLatitude, m_weatherLongitude).untilBoundary;
+      day_night_schedule::evaluate(m_location, m_resolvedLatitude, m_resolvedLongitude).untilBoundary;
   const auto delay =
       std::min(boundaryDelay, std::chrono::duration_cast<std::chrono::milliseconds>(kScheduleRecheckInterval));
   kLog.debug(
@@ -146,7 +146,7 @@ void GammaService::scheduleManualTimer() {
 
 void GammaService::scheduleGeoTimer() {
   const auto boundaryDelay =
-      day_night_schedule::evaluate(m_location, m_weatherLatitude, m_weatherLongitude).untilBoundary;
+      day_night_schedule::evaluate(m_location, m_resolvedLatitude, m_resolvedLongitude).untilBoundary;
   const auto delay =
       std::min(boundaryDelay, std::chrono::duration_cast<std::chrono::milliseconds>(kScheduleRecheckInterval));
   kLog.debug(
@@ -161,7 +161,7 @@ void GammaService::scheduleGeoTimer() {
 }
 
 bool GammaService::isNightPhase() const {
-  return day_night_schedule::evaluate(m_location, m_weatherLatitude, m_weatherLongitude).night;
+  return day_night_schedule::evaluate(m_location, m_resolvedLatitude, m_resolvedLongitude).night;
 }
 
 // --- Gamma ramp math ---
@@ -404,29 +404,25 @@ int GammaService::targetTemperature() const {
     return nightTemp;
   }
 
-  const bool manualMode = day_night_schedule::isManualMode(m_location, m_weatherLatitude, m_weatherLongitude);
+  const bool manualMode = day_night_schedule::isManualMode(m_location, m_resolvedLatitude, m_resolvedLongitude);
   if (manualMode) {
-    return day_night_schedule::evaluate(m_location, m_weatherLatitude, m_weatherLongitude).night ? nightTemp : dayTemp;
+    return day_night_schedule::evaluate(m_location, m_resolvedLatitude, m_resolvedLongitude).night ? nightTemp
+                                                                                                   : dayTemp;
   }
 
-  const auto coords = day_night_schedule::resolveCoordinates(m_location, m_weatherLatitude, m_weatherLongitude);
+  const auto coords = day_night_schedule::resolveCoordinates(m_location, m_resolvedLatitude, m_resolvedLongitude);
   if (!coords.latitude.has_value() || !coords.longitude.has_value()) {
-    if (!m_location.useWeatherLocation && (m_location.latitude.has_value() || m_location.longitude.has_value())) {
-      kLog.warn("need both latitude and longitude when overriding location mode");
-    } else if (!m_location.useWeatherLocation) {
-      kLog.warn("no schedule: set sunset/sunrise or latitude/longitude, or enable weather location");
-    } else if (m_weatherLocationConfigured) {
-      kLog.debug("night light schedule waiting for weather location");
+    if (m_location.latitude.has_value() != m_location.longitude.has_value()) {
+      kLog.warn("need both latitude and longitude for manual location");
+    } else if (m_locationResolving) {
+      kLog.debug("night light schedule waiting for location resolution");
     } else {
-      kLog.warn(
-          "no schedule: configure weather location or disable weather location and set sunset/sunrise or "
-          "latitude/longitude"
-      );
+      kLog.warn("no schedule: enable auto-locate, set an address, or set latitude/longitude or sunset/sunrise");
     }
     return -1;
   }
 
-  return day_night_schedule::evaluate(m_location, m_weatherLatitude, m_weatherLongitude).night ? nightTemp : dayTemp;
+  return day_night_schedule::evaluate(m_location, m_resolvedLatitude, m_resolvedLongitude).night ? nightTemp : dayTemp;
 }
 
 void GammaService::apply() {
@@ -441,11 +437,11 @@ void GammaService::apply() {
     return;
   }
 
-  const bool manualMode = day_night_schedule::isManualMode(m_location, m_weatherLatitude, m_weatherLongitude);
+  const bool manualMode = day_night_schedule::isManualMode(m_location, m_resolvedLatitude, m_resolvedLongitude);
   if (effectiveEnabled() && manualMode) {
     scheduleManualTimer();
   } else if (effectiveEnabled() && !effectiveForce()) {
-    const auto coords = day_night_schedule::resolveCoordinates(m_location, m_weatherLatitude, m_weatherLongitude);
+    const auto coords = day_night_schedule::resolveCoordinates(m_location, m_resolvedLatitude, m_resolvedLongitude);
     if (coords.latitude.has_value() && coords.longitude.has_value()) {
       scheduleGeoTimer();
     } else {

@@ -30,7 +30,7 @@ namespace day_night_schedule {
       return local.tm_sec;
     }
 
-    bool hasWeatherCoordinates(std::optional<double> latitude, std::optional<double> longitude) {
+    bool hasResolvedCoordinates(std::optional<double> latitude, std::optional<double> longitude) {
       return latitude.has_value() && longitude.has_value();
     }
 
@@ -115,10 +115,10 @@ namespace day_night_schedule {
   }
 
   GeoCoordinates resolveCoordinates(
-      const LocationConfig& config, std::optional<double> weatherLatitude, std::optional<double> weatherLongitude
+      const LocationConfig& config, std::optional<double> resolvedLatitude, std::optional<double> resolvedLongitude
   ) {
-    if (config.useWeatherLocation && hasWeatherCoordinates(weatherLatitude, weatherLongitude)) {
-      return GeoCoordinates{.latitude = weatherLatitude, .longitude = weatherLongitude};
+    if (hasResolvedCoordinates(resolvedLatitude, resolvedLongitude)) {
+      return GeoCoordinates{.latitude = resolvedLatitude, .longitude = resolvedLongitude};
     }
     if (config.latitude.has_value() && config.longitude.has_value()) {
       return GeoCoordinates{.latitude = config.latitude, .longitude = config.longitude};
@@ -127,20 +127,22 @@ namespace day_night_schedule {
   }
 
   bool isManualMode(
-      const LocationConfig& config, std::optional<double> weatherLatitude, std::optional<double> weatherLongitude
+      const LocationConfig& config, std::optional<double> resolvedLatitude, std::optional<double> resolvedLongitude
   ) {
-    return (!config.useWeatherLocation || !hasWeatherCoordinates(weatherLatitude, weatherLongitude))
+    // Fixed clock times apply only when no coordinates (resolved or manual) are available.
+    return !hasResolvedCoordinates(resolvedLatitude, resolvedLongitude)
+        && !(config.latitude.has_value() && config.longitude.has_value())
         && normalizedClock(config.sunset).has_value()
         && normalizedClock(config.sunrise).has_value();
   }
 
   Evaluation evaluate(
-      const LocationConfig& config, std::optional<double> weatherLatitude, std::optional<double> weatherLongitude
+      const LocationConfig& config, std::optional<double> resolvedLatitude, std::optional<double> resolvedLongitude
   ) {
     const int nowMin = currentLocalMinutes();
     const int nowSec = currentLocalSeconds();
 
-    if (isManualMode(config, weatherLatitude, weatherLongitude)) {
+    if (isManualMode(config, resolvedLatitude, resolvedLongitude)) {
       const int sunsetMin = timeToMinutes(config.sunset);
       const int sunriseMin = timeToMinutes(config.sunrise);
       const bool night = sunsetMin < sunriseMin ? (nowMin >= sunsetMin && nowMin < sunriseMin)
@@ -154,7 +156,7 @@ namespace day_night_schedule {
       return Evaluation{.night = night, .untilBoundary = std::max(ms, std::chrono::milliseconds(1000))};
     }
 
-    const auto coords = resolveCoordinates(config, weatherLatitude, weatherLongitude);
+    const auto coords = resolveCoordinates(config, resolvedLatitude, resolvedLongitude);
     if (!coords.latitude.has_value() || !coords.longitude.has_value()) {
       return Evaluation{.night = false, .untilBoundary = std::chrono::hours(1)};
     }

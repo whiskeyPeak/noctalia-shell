@@ -749,9 +749,7 @@ struct ShellConfig {
 
 struct WeatherConfig {
   bool enabled = true;
-  bool autoLocate = false;
   bool effects = true;
-  std::string address;
   std::int32_t refreshMinutes = 30;
   std::string unit = "metric";
 
@@ -864,9 +862,13 @@ struct NightLightConfig {
 };
 
 struct LocationConfig {
-  bool useWeatherLocation = true; // prefer WeatherService coordinates; fall back to manual schedule/location if absent
-  std::string sunset;             // HH:MM night start for manual schedule
-  std::string sunrise;            // HH:MM day start for manual schedule
+  // Single source of truth for "where am I". Resolution priority:
+  //   auto_locate (IP) -> address (geocoded) -> manual latitude/longitude -> manual sunrise/sunset.
+  // Consumed by the weather service, night light, and theme auto mode.
+  bool autoLocate = false; // resolve coordinates from IP geolocation
+  std::string address;     // geocoded when auto_locate is off and this is non-empty
+  std::string sunset;      // HH:MM night start, used only when no coordinates resolve
+  std::string sunrise;     // HH:MM day start, used only when no coordinates resolve
   std::optional<double> latitude;
   std::optional<double> longitude;
 

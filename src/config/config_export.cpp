@@ -729,9 +729,7 @@ namespace config_export {
 
     toml::table weather;
     weather.insert_or_assign("enabled", config.weather.enabled);
-    weather.insert_or_assign("auto_locate", config.weather.autoLocate);
     weather.insert_or_assign("effects", config.weather.effects);
-    weather.insert_or_assign("address", config.weather.address);
     weather.insert_or_assign("refresh_minutes", static_cast<std::int64_t>(config.weather.refreshMinutes));
     weather.insert_or_assign("unit", config.weather.unit);
     root.insert_or_assign("weather", std::move(weather));
@@ -754,7 +752,8 @@ namespace config_export {
     root.insert_or_assign("nightlight", std::move(nightlight));
 
     toml::table location;
-    location.insert_or_assign("use_weather_location", config.location.useWeatherLocation);
+    location.insert_or_assign("auto_locate", config.location.autoLocate);
+    location.insert_or_assign("address", config.location.address);
     location.insert_or_assign("sunset", config.location.sunset);
     location.insert_or_assign("sunrise", config.location.sunrise);
     if (config.location.latitude.has_value()) {

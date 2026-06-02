@@ -299,6 +299,8 @@ namespace settings {
       return "activity-heartbeat";
     if (section == "services")
       return "stack-2";
+    if (section == "location")
+      return "map-pin";
     if (section == "hooks")
       return "link";
     if (section == "popups")
@@ -1385,24 +1387,82 @@ namespace settings {
         ToggleSetting{cfg.shell.screenTimeEnabled}, "screen time usage tracking control center"
     ));
 
-    // Services
+    // Location — single source of "where am I"; shared by weather, night light, and theme auto mode.
     entries.push_back(makeEntry(
-        "services", "weather", tr("settings.schema.services.weather.label"),
+        "location", "location", tr("settings.schema.services.location-auto-locate.label"),
+        tr("settings.schema.services.location-auto-locate.description"), {"location", "auto_locate"},
+        ToggleSetting{cfg.location.autoLocate}, "location ip geolocate gps coordinate"
+    ));
+    const SettingVisibility autoLocateOff{{"location", "auto_locate"}, {"false"}};
+    {
+      auto e = makeEntry(
+          "location", "location", tr("settings.schema.services.location-address.label"),
+          tr("settings.schema.services.location-address.description"), {"location", "address"},
+          TextSetting{
+              .value = cfg.location.address,
+              .placeholder = tr("settings.schema.services.location-address.placeholder"),
+              .browseFileExtensions = {}
+          },
+          "location address city geocode"
+      );
+      e.visibleWhen = autoLocateOff;
+      entries.push_back(std::move(e));
+    }
+    // Manual schedule fallback: shown only when no network location is configured (auto-locate off
+    // and no address). The address gate is build-time; the auto-locate gate is evaluated live.
+    const SettingVisibility manualLocationHidden{{"location", "auto_locate"}, {}};
+    const SettingVisibility& manualLocationControlsVisible =
+        cfg.location.address.empty() ? autoLocateOff : manualLocationHidden;
+    {
+      auto e = makeEntry(
+          "location", "location", tr("settings.schema.services.sunset.label"),
+          tr("settings.schema.services.sunset.description"), {"location", "sunset"},
+          TextSetting{.value = cfg.location.sunset, .placeholder = "20:30", .browseFileExtensions = {}},
+          "time schedule sunset"
+      );
+      e.visibleWhen = manualLocationControlsVisible;
+      entries.push_back(std::move(e));
+    }
+    {
+      auto e = makeEntry(
+          "location", "location", tr("settings.schema.services.sunrise.label"),
+          tr("settings.schema.services.sunrise.description"), {"location", "sunrise"},
+          TextSetting{.value = cfg.location.sunrise, .placeholder = "07:30", .browseFileExtensions = {}},
+          "time schedule sunrise"
+      );
+      e.visibleWhen = manualLocationControlsVisible;
+      entries.push_back(std::move(e));
+    }
+    {
+      auto e = makeEntry(
+          "location", "location", tr("settings.schema.services.latitude.label"),
+          tr("settings.schema.services.latitude.description"), {"location", "latitude"},
+          OptionalNumberSetting{cfg.location.latitude, -90.0, 90.0, "52.5200"}, "coordinate location sunrise sunset",
+          true
+      );
+      e.visibleWhen = manualLocationControlsVisible;
+      entries.push_back(std::move(e));
+    }
+    {
+      auto e = makeEntry(
+          "location", "location", tr("settings.schema.services.longitude.label"),
+          tr("settings.schema.services.longitude.description"), {"location", "longitude"},
+          OptionalNumberSetting{cfg.location.longitude, -180.0, 180.0, "13.4050"}, "coordinate location sunrise sunset",
+          true
+      );
+      e.visibleWhen = manualLocationControlsVisible;
+      entries.push_back(std::move(e));
+    }
+
+    // Weather — consumes the resolved location.
+    entries.push_back(makeEntry(
+        "location", "weather", tr("settings.schema.services.weather.label"),
         tr("settings.schema.services.weather.description"), {"weather", "enabled"}, ToggleSetting{cfg.weather.enabled},
         "forecast"
     ));
     {
       auto e = makeEntry(
-          "services", "weather", tr("settings.schema.services.weather-location.label"),
-          tr("settings.schema.services.weather-location.description"), {"weather", "auto_locate"},
-          ToggleSetting{cfg.weather.autoLocate}, "forecast gps"
-      );
-      e.visibleWhen = weatherOn;
-      entries.push_back(std::move(e));
-    }
-    {
-      auto e = makeEntry(
-          "services", "weather", tr("settings.schema.services.weather-unit.label"),
+          "location", "weather", tr("settings.schema.services.weather-unit.label"),
           tr("settings.schema.services.weather-unit.description"), {"weather", "unit"},
           asSegmented(plainSelect(
               {{"metric", "settings.options.weather.unit.metric"},
@@ -1416,21 +1476,7 @@ namespace settings {
     }
     {
       auto e = makeEntry(
-          "services", "weather", tr("settings.schema.services.weather-address.label"),
-          tr("settings.schema.services.weather-address.description"), {"weather", "address"},
-          TextSetting{
-              .value = cfg.weather.address,
-              .placeholder = tr("settings.schema.services.weather-address.placeholder"),
-              .browseFileExtensions = {}
-          },
-          "location"
-      );
-      e.visibleWhen = weatherOn;
-      entries.push_back(std::move(e));
-    }
-    {
-      auto e = makeEntry(
-          "services", "weather", tr("settings.schema.services.weather-effects.label"),
+          "location", "weather", tr("settings.schema.services.weather-effects.label"),
           tr("settings.schema.services.weather-effects.description"), {"weather", "effects"},
           ToggleSetting{cfg.weather.effects}, "forecast visuals"
       );
@@ -1439,7 +1485,7 @@ namespace settings {
     }
     {
       auto e = makeEntry(
-          "services", "weather", tr("settings.schema.services.weather-refresh-interval.label"),
+          "location", "weather", tr("settings.schema.services.weather-refresh-interval.label"),
           tr("settings.schema.services.weather-refresh-interval.description"), {"weather", "refresh_minutes"},
           SliderSetting{cfg.weather.refreshMinutes, 5.0f, 240.0f, 5.0f, true}, "forecast"
       );
@@ -1447,75 +1493,22 @@ namespace settings {
       entries.push_back(std::move(e));
     }
 
-    const bool weatherLocationConfigured =
-        cfg.weather.enabled && (cfg.weather.autoLocate || !cfg.weather.address.empty());
-    entries.push_back(makeEntry(
-        "services", "location", tr("settings.schema.services.weather-location.label"),
-        tr("settings.schema.services.location.description"), {"location", "use_weather_location"},
-        ToggleSetting{cfg.location.useWeatherLocation}, "location schedule sunrise sunset"
-    ));
-    const SettingVisibility locationWeatherLocationOff{std::vector<SettingVisibilityCondition>{
-        {{"location", "use_weather_location"}, {"false"}},
-    }};
-    const SettingVisibility& manualLocationControlsVisible =
-        weatherLocationConfigured ? locationWeatherLocationOff : SettingVisibility{};
-    {
-      auto e = makeEntry(
-          "services", "location", tr("settings.schema.services.sunset.label"),
-          tr("settings.schema.services.sunset.description"), {"location", "sunset"},
-          TextSetting{.value = cfg.location.sunset, .placeholder = "20:30", .browseFileExtensions = {}},
-          "time schedule sunset"
-      );
-      e.visibleWhen = manualLocationControlsVisible;
-      entries.push_back(std::move(e));
-    }
-    {
-      auto e = makeEntry(
-          "services", "location", tr("settings.schema.services.sunrise.label"),
-          tr("settings.schema.services.sunrise.description"), {"location", "sunrise"},
-          TextSetting{.value = cfg.location.sunrise, .placeholder = "07:30", .browseFileExtensions = {}},
-          "time schedule sunrise"
-      );
-      e.visibleWhen = manualLocationControlsVisible;
-      entries.push_back(std::move(e));
-    }
-    {
-      auto e = makeEntry(
-          "services", "location", tr("settings.schema.services.latitude.label"),
-          tr("settings.schema.services.latitude.description"), {"location", "latitude"},
-          OptionalNumberSetting{cfg.location.latitude, -90.0, 90.0, "52.5200"}, "coordinate location sunrise sunset",
-          true
-      );
-      e.visibleWhen = manualLocationControlsVisible;
-      entries.push_back(std::move(e));
-    }
-    {
-      auto e = makeEntry(
-          "services", "location", tr("settings.schema.services.longitude.label"),
-          tr("settings.schema.services.longitude.description"), {"location", "longitude"},
-          OptionalNumberSetting{cfg.location.longitude, -180.0, 180.0, "13.4050"}, "coordinate location sunrise sunset",
-          true
-      );
-      e.visibleWhen = manualLocationControlsVisible;
-      entries.push_back(std::move(e));
-    }
-
     if (!env.gammaControlAvailable) {
       entries.push_back(makeEntry(
-          "services", "night-light", tr("settings.schema.services.night-light.label"),
+          "location", "night-light", tr("settings.schema.services.night-light.label"),
           tr("settings.schema.services.night-light.requires-gamma-control"), {"nightlight", "enabled"},
           ToggleSetting{.checked = cfg.nightlight.enabled, .enabled = false}, "nightlight"
       ));
     } else {
       entries.push_back(makeEntry(
-          "services", "night-light", tr("settings.schema.services.night-light.label"),
+          "location", "night-light", tr("settings.schema.services.night-light.label"),
           tr("settings.schema.services.night-light.description"), {"nightlight", "enabled"},
           ToggleSetting{cfg.nightlight.enabled}, "nightlight"
       ));
       const SettingVisibility nightLightOn{{"nightlight", "enabled"}, {"true"}};
       {
         auto e = makeEntry(
-            "services", "night-light", tr("settings.schema.services.force-night-light.label"),
+            "location", "night-light", tr("settings.schema.services.force-night-light.label"),
             tr("settings.schema.services.force-night-light.description"), {"nightlight", "force"},
             ToggleSetting{cfg.nightlight.force}, "nightlight"
         );
@@ -1555,7 +1548,7 @@ namespace settings {
       };
       {
         auto e = makeEntry(
-            "services", "night-light", tr("settings.schema.services.day-temperature.label"),
+            "location", "night-light", tr("settings.schema.services.day-temperature.label"),
             tr("settings.schema.services.day-temperature.description"), {"nightlight", "temperature_day"},
             std::move(daySlider), "nightlight kelvin"
         );
@@ -1588,7 +1581,7 @@ namespace settings {
       };
       {
         auto e = makeEntry(
-            "services", "night-light", tr("settings.schema.services.night-temperature.label"),
+            "location", "night-light", tr("settings.schema.services.night-temperature.label"),
             tr("settings.schema.services.night-temperature.description"), {"nightlight", "temperature_night"},
             std::move(nightSlider), "nightlight kelvin"
         );

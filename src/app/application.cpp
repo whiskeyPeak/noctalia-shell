@@ -68,10 +68,6 @@ namespace {
     return std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - start).count();
   }
 
-  bool weatherLocationConfiguredForNightLight(const WeatherConfig& weather) {
-    return weather.enabled && (weather.autoLocate || !weather.address.empty());
-  }
-
   bool widgetIsLockKeys(std::string_view widgetName, const Config& config) {
     auto it = config.widgets.find(std::string(widgetName));
     if (it == config.widgets.end()) {
@@ -145,8 +141,8 @@ namespace {
 } // namespace
 
 Application::Application()
-    : m_lockKeysService(m_wayland), m_gammaService(m_wayland), m_weatherService(m_configService, m_httpClient),
-      m_calendarService(m_configService, m_httpClient) {
+    : m_lockKeysService(m_wayland), m_gammaService(m_wayland), m_locationService(m_configService, m_httpClient),
+      m_weatherService(m_configService, m_httpClient), m_calendarService(m_configService, m_httpClient) {
   m_notificationManager.loadPersistedHistory();
   notify::setInstance(&m_notificationManager);
 
@@ -585,12 +581,7 @@ void Application::initServices() {
       },
       "hooks"
   );
-  auto syncNightLightWeatherConfig = [this]() {
-    m_gammaService.setWeatherLocationConfigured(
-        weatherLocationConfiguredForNightLight(m_configService.config().weather)
-    );
-  };
-  syncNightLightWeatherConfig();
+  m_gammaService.setLocationResolving(m_locationService.resolving());
   m_gammaService.reload(m_configService.config().nightlight, m_configService.config().location);
   m_gammaService.setChangeCallback([this, shouldRefreshControlCenter]() {
     m_bar.refresh();
@@ -598,8 +589,7 @@ void Application::initServices() {
       m_panelManager.refresh();
     }
   });
-  m_configService.addReloadCallback([this, syncNightLightWeatherConfig]() {
-    syncNightLightWeatherConfig();
+  m_configService.addReloadCallback([this]() {
     m_gammaService.reload(m_configService.config().nightlight, m_configService.config().location);
   });
 
@@ -963,30 +953,39 @@ void Application::initServices() {
     });
   }
 
+  m_locationService.initialize();
   m_weatherService.initialize();
   m_calendarService.initialize();
-  auto syncNightLightWeatherCoordinates = [this]() {
-    m_gammaService.setWeatherLocationConfigured(m_weatherService.enabled() && m_weatherService.locationConfigured());
-    const auto coords = m_weatherService.resolvedCoordinates();
-    if (coords.has_value()) {
-      m_gammaService.setWeatherCoordinates(coords->latitude, coords->longitude);
-      m_themeService.setAutoCoordinates(coords->latitude, coords->longitude);
+
+  // LocationService is the single source of "where am I": push its resolved coordinates to the
+  // weather service, night light, and theme auto mode. Manual latitude/longitude and fixed
+  // sunrise/sunset live in [location] and reach night light/theme through their config reloads.
+  auto pushLocation = [this]() {
+    m_gammaService.setLocationResolving(m_locationService.resolving());
+    const auto location = m_locationService.resolvedLocation();
+    if (location.has_value()) {
+      m_weatherService.setLocation(
+          WeatherCoordinates{.latitude = location->latitude, .longitude = location->longitude}, location->name,
+          location->sourceLabel
+      );
+      m_gammaService.setResolvedCoordinates(location->latitude, location->longitude);
+      m_themeService.setAutoCoordinates(location->latitude, location->longitude);
     } else {
-      m_gammaService.setWeatherCoordinates(std::nullopt, std::nullopt);
+      m_weatherService.setLocation(std::nullopt, {}, {});
+      m_gammaService.setResolvedCoordinates(std::nullopt, std::nullopt);
       m_themeService.setAutoCoordinates(std::nullopt, std::nullopt);
     }
   };
-  syncNightLightWeatherCoordinates();
-  m_weatherService.addChangeCallback([this, shouldRefreshControlCenter]() {
-    m_gammaService.setWeatherLocationConfigured(m_weatherService.enabled() && m_weatherService.locationConfigured());
-    const auto coords = m_weatherService.resolvedCoordinates();
-    if (coords.has_value()) {
-      m_gammaService.setWeatherCoordinates(coords->latitude, coords->longitude);
-      m_themeService.setAutoCoordinates(coords->latitude, coords->longitude);
-    } else {
-      m_gammaService.setWeatherCoordinates(std::nullopt, std::nullopt);
-      m_themeService.setAutoCoordinates(std::nullopt, std::nullopt);
+  pushLocation();
+  m_locationService.addChangeCallback([this, pushLocation, shouldRefreshControlCenter]() {
+    pushLocation();
+    m_bar.refresh();
+    m_desktopWidgetsController.requestLayout();
+    if (shouldRefreshControlCenter()) {
+      m_panelManager.refresh();
     }
+  });
+  m_weatherService.addChangeCallback([this, shouldRefreshControlCenter]() {
     m_bar.refresh();
     m_desktopWidgetsController.requestLayout();
     if (shouldRefreshControlCenter()) {
@@ -1820,6 +1819,7 @@ std::vector<PollSource*> Application::currentPollSources() {
   sources.push_back(&m_fileWatchPollSource);
   sources.push_back(&m_ipcPollSource);
   sources.push_back(&m_httpClientPollSource);
+  sources.push_back(&m_locationPollSource);
   sources.push_back(&m_weatherPollSource);
   sources.push_back(&m_calendarPollSource);
   sources.push_back(&m_thumbnailService);

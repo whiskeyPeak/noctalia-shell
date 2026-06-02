@@ -110,7 +110,7 @@
       "sort-date-desc": "Sort by date (newest first)"
     }
   },
-  "weather": {
+  "location": {
     "locations": {
       "current": "Current location"
     },
@@ -118,6 +118,14 @@
       "auto": "Auto",
       "address": "Address"
     },
+    "errors": {
+      "ip-geolocation-failed": "IP geolocation failed",
+      "address-lookup-failed": "Address lookup failed",
+      "parse-ip-geolocation": "Could not parse IP geolocation response",
+      "parse-geocode": "Could not parse geocode response"
+    }
+  },
+  "weather": {
     "conditions": {
       "short": {
         "clear": "Clear",
@@ -147,10 +155,6 @@
       }
     },
     "errors": {
-      "ip-geolocation-failed": "IP geolocation failed",
-      "address-lookup-failed": "Address lookup failed",
-      "parse-ip-geolocation": "Could not parse IP geolocation response",
-      "parse-geocode": "Could not parse geocode response",
       "fetch-failed": "Weather fetch failed",
       "parse-weather": "Could not parse weather response"
     }
@@ -882,6 +886,7 @@
         "dock": "Dock",
         "hooks": "Hooks",
         "idle": "Idle",
+        "location": "Location",
         "niri": "Niri",
         "panels": "Panels",
         "notifications": "Notifications",
@@ -2206,18 +2211,18 @@
             "description": "1-120 seconds between disk usage and swap usage samples"
           }
         },
-        "weather-location": {
-          "label": "Auto-Locate",
-          "description": "Automatically detect location for weather"
+        "location-auto-locate": {
+          "label": "Auto-Locate (IP)",
+          "description": "Detect your location automatically from your IP address"
+        },
+        "location-address": {
+          "label": "Address",
+          "description": "City or address to locate, used when auto-locate is off",
+          "placeholder": "City, Country"
         },
         "weather-unit": {
           "label": "Units",
           "description": "Unit system for weather display"
-        },
-        "weather-address": {
-          "label": "Address",
-          "description": "Manual location for weather (used when auto-locate is off)",
-          "placeholder": "City, Country"
         },
         "weather-effects": {
           "label": "Weather Effects",
@@ -2267,16 +2272,13 @@
           "label": "Force Night Light",
           "description": "Always apply night light regardless of time"
         },
-        "location": {
-          "description": "Shared sunrise/sunset schedule for auto theme mode and night light"
-        },
         "sunset": {
           "label": "Sunset",
-          "description": "Manual sunset time in HH:MM when weather location is off"
+          "description": "Manual sunset time in HH:MM, used when no location is set"
         },
         "sunrise": {
           "label": "Sunrise",
-          "description": "Manual sunrise time in HH:MM when weather location is off"
+          "description": "Manual sunrise time in HH:MM, used when no location is set"
         },
         "night-light-start-time": {
           "label": "Start Time",
@@ -2288,11 +2290,11 @@
         },
         "latitude": {
           "label": "Latitude",
-          "description": "Manual sunrise/sunset latitude when weather location is off and fixed times are unset"
+          "description": "Manual latitude for the sunrise/sunset schedule, used when auto-locate and address are off"
         },
         "longitude": {
           "label": "Longitude",
-          "description": "Manual sunrise/sunset longitude when weather location is off and fixed times are unset"
+          "description": "Manual longitude for the sunrise/sunset schedule, used when auto-locate and address are off"
         },
         "day-temperature": {
           "label": "Day Temperature",

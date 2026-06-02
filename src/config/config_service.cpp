@@ -2244,12 +2244,8 @@ void ConfigService::parseTableInto(const toml::table& tbl, Config& config, bool 
     auto& weather = config.weather;
     if (auto v = (*weatherTbl)["enabled"].value<bool>())
       weather.enabled = *v;
-    if (auto v = (*weatherTbl)["auto_locate"].value<bool>())
-      weather.autoLocate = *v;
     if (auto v = (*weatherTbl)["effects"].value<bool>())
       weather.effects = *v;
-    if (auto v = (*weatherTbl)["address"].value<std::string>())
-      weather.address = *v;
     if (auto v = (*weatherTbl)["refresh_minutes"].value<int64_t>())
       weather.refreshMinutes = static_cast<std::int32_t>(*v);
     if (auto v = (*weatherTbl)["unit"].value<std::string>())
@@ -2454,8 +2450,11 @@ void ConfigService::parseTableInto(const toml::table& tbl, Config& config, bool 
   // Parse [location]
   if (auto* locationTbl = tbl["location"].as_table()) {
     auto& location = config.location;
-    if (auto v = (*locationTbl)["use_weather_location"].value<bool>()) {
-      location.useWeatherLocation = *v;
+    if (auto v = (*locationTbl)["auto_locate"].value<bool>()) {
+      location.autoLocate = *v;
+    }
+    if (auto v = (*locationTbl)["address"].value<std::string>()) {
+      location.address = *v;
     }
     if (auto v = (*locationTbl)["sunset"].value<std::string>()) {
       location.sunset = *v;

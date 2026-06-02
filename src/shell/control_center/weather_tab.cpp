@@ -592,7 +592,7 @@ void WeatherTab::sync(Renderer& renderer) {
                              : i18n::tr("control-center.weather.data-unavailable")
     );
     m_updatedLabel->setText(
-        snapshot.locationName.empty() ? i18n::tr("weather.locations.current") : snapshot.locationName
+        snapshot.locationName.empty() ? i18n::tr("location.locations.current") : snapshot.locationName
     );
     m_updatedLabel->setVisible(false);
     m_statusLabel->setText(m_weather->error());
@@ -651,7 +651,7 @@ void WeatherTab::sync(Renderer& renderer) {
   }
   m_currentDescLabel->setText(WeatherService::descriptionForCode(snapshot.current.weatherCode));
   m_updatedLabel->setText(
-      snapshot.locationName.empty() ? i18n::tr("weather.locations.current") : snapshot.locationName
+      snapshot.locationName.empty() ? i18n::tr("location.locations.current") : snapshot.locationName
   );
   m_updatedLabel->setVisible(showLocation);
   const std::string status = m_weather->loading() ? i18n::tr("control-center.weather.refreshing")
