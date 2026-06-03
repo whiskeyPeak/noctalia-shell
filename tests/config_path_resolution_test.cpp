@@ -53,6 +53,11 @@ int main() {
   expectKnown({"wallpaper", "fill_color"});
   expectKnown({"dock", "icon_size"});
   expectKnown({"dock", "radius_top_left"});
+  expectKnown({"desktop_widgets", "enabled"});
+  expectKnown({"desktop_widgets", "grid", "cell_size"});
+  expectKnown({"desktop_widgets", "widget_order"});
+  expectKnown({"desktop_widgets", "widget", "clock1", "type"});
+  expectKnown({"desktop_widgets", "widget", "clock1", "settings", "format"});
   expectKnown({"osd", "scale"});
   expectKnown({"notification", "background_opacity"});
   expectKnown({"battery", "warning_threshold"});
@@ -74,6 +79,9 @@ int main() {
   expectUnknown({"shel", "ui_scale"});                           // section typo
   expectUnknown({"shell"});                                      // bare section
   expectUnknown({"dock", "radius_top_typo"});
+  expectUnknown({"desktop_widgets", "enabeld"});
+  expectUnknown({"desktop_widgets", "grid", "cell_szie"});
+  expectUnknown({"desktop_widgets", "widget", "clock1", "bogus"});
   expectUnknown({"bar", "default", "thicknesss"});
   expectUnknown({"bar", "default", "monitor", "DP-1", "bogus"});
   expectUnknown({});

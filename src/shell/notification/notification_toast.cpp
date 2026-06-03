@@ -678,7 +678,7 @@ void NotificationToast::onNotificationEvent(const Notification& n, NotificationE
           bool regionChanged = false;
 
           if (layoutChanged) {
-            const float preservedReveal = cardReveal(cs, m_entries[i].height);
+            const float preservedReveal = cardReveal(cs, cs.clipHeight);
             const float preservedContentOpacity = cs.cardForeground != nullptr ? cs.cardForeground->opacity() : 1.0f;
             // If the entry reveal animation was still running when this update/replace
             // arrived (e.g. Thunar replacing its USB notification mid-reveal), the rebuilt
@@ -710,10 +710,9 @@ void NotificationToast::onNotificationEvent(const Notification& n, NotificationE
                 &cs.inlineReplyRowNode, &cs.inlineReplyInput
             );
             cs.cardNode = rebuilt;
-            const float revealY = hasPlacement(m_entries[i])
-                ? entryYForSurface(m_entries[i], static_cast<float>(inst->surface->height()))
-                : 0.0f;
-            applyCardReveal(cs, preservedReveal, revealY, m_entries[i].height);
+            cs.clipHeight = rebuilt->height();
+            const float revealY = hasPlacement(m_entries[i]) ? cardSurfaceY(*inst, i) : 0.0f;
+            applyCardReveal(cs, preservedReveal, revealY, cs.clipHeight);
             if (cs.cardForeground != nullptr) {
               cs.cardForeground->setOpacity(preservedContentOpacity);
               cs.cardForeground->setPosition(
@@ -726,12 +725,12 @@ void NotificationToast::onNotificationEvent(const Notification& n, NotificationE
             // Resume an interrupted reveal so the card finishes opening instead of
             // staying scissored at its partial size.
             if (entryRevealInFlight && preservedReveal < 1.0f && hasPlacement(m_entries[i])) {
-              const float targetY = entryYForSurface(m_entries[i], static_cast<float>(inst->surface->height()));
+              const float targetY = cardSurfaceY(*inst, i);
               Instance* instPtr = inst.get();
               cs.entryAnimId = inst->animations.animate(
                   preservedReveal, 1.0f, Style::animNormal, Easing::EaseOutCubic,
                   [this, viewport = cs.cardNode, content = cs.cardContent, foreground = cs.cardForeground, targetY,
-                   cardHeight = m_entries[i].height, scale = notificationUiScale(m_config),
+                   cardHeight = cs.clipHeight, scale = notificationUiScale(m_config),
                    edgePad = horizontalInnerPad(notificationUiScale(m_config))](float v) {
                     applyCardRevealNodes(
                         viewport, content, foreground, v, targetY, revealDirection(), cardHeight, scale, edgePad
@@ -936,6 +935,12 @@ void NotificationToast::finishRemoval(uint32_t notificationId) {
       collapseStack();
     }
     revealQueuedEntries();
+    // A placed entry can overflow a shorter monitor and stay absent there while it fits a
+    // taller one. Now that this dismissal freed room (and any collapse repacked the stack),
+    // re-check per-instance visibility so it appears on monitors where it now fits.
+    for (std::size_t i = 0; i < m_entries.size(); ++i) {
+      syncEntryVisibility(i);
+    }
   }
 }
 
@@ -958,9 +963,10 @@ void NotificationToast::addCardToInstance(Instance& inst, std::size_t entryIndex
       &cs.inlineReplyInput
   );
   cs.cardNode = card;
+  cs.clipHeight = card->height();
 
-  const float targetY = entryYForSurface(entry, static_cast<float>(inst.surface->height()));
-  applyCardReveal(cs, 0.0f, targetY, entry.height);
+  const float targetY = cardSurfaceY(inst, entryIndex);
+  applyCardReveal(cs, 0.0f, targetY, cs.clipHeight);
 
   inst.sceneRoot->addChild(std::unique_ptr<Node>(card));
 
@@ -968,7 +974,7 @@ void NotificationToast::addCardToInstance(Instance& inst, std::size_t entryIndex
   cs.entryAnimId = inst.animations.animate(
       0.0f, 1.0f, Style::animNormal, Easing::EaseOutCubic,
       [this, viewport = cs.cardNode, content = cs.cardContent, foreground = cs.cardForeground, targetY,
-       cardHeight = entry.height, scale = notificationUiScale(m_config),
+       cardHeight = cs.clipHeight, scale = notificationUiScale(m_config),
        edgePad = horizontalInnerPad(notificationUiScale(m_config))](float v) {
         applyCardRevealNodes(viewport, content, foreground, v, targetY, revealDirection(), cardHeight, scale, edgePad);
       },
@@ -1140,7 +1146,7 @@ void NotificationToast::dismissCardFromInstance(Instance& inst, std::size_t entr
   Node* card = cs.cardNode;
   Node* content = cs.cardContent;
   Node* foreground = cs.cardForeground;
-  const float cardHeight = (entryIndex < m_entries.size()) ? m_entries[entryIndex].height : card->height();
+  const float cardHeight = cs.clipHeight > 0.0f ? cs.clipHeight : card->height();
   const float startReveal = cardReveal(cs, cardHeight);
   const float targetY = card->y();
   const uint32_t removingId = (entryIndex < m_entries.size()) ? m_entries[entryIndex].notificationId : 0;
@@ -1537,14 +1543,59 @@ float NotificationToast::entryOffsetFromPlacementBottom(const PopupEntry& entry)
   return maxPlacementBottom() - entry.y;
 }
 
-float NotificationToast::entryYForSurface(const PopupEntry& entry, float surfaceHeight) const {
-  if (!hasPlacement(entry)) {
-    return entry.y;
+float NotificationToast::cardSurfaceY(const Instance& inst, std::size_t entryIndex) const {
+  if (entryIndex >= m_entries.size() || inst.surface == nullptr) {
+    return 0.0f;
   }
-  if (isBottomStacking()) {
-    return layoutBottomForSurfaceHeight(surfaceHeight) - entryOffsetFromPlacementBottom(entry);
+  const float scale = notificationUiScale(m_config);
+  const float layoutGap = kGap * scale;
+  const bool bottom = isBottomStacking();
+  const float surfaceHeight = static_cast<float>(inst.surface->height());
+  const float layoutBottom = layoutBottomForSurfaceHeight(surfaceHeight);
+  const float placementBottom = maxPlacementBottom();
+
+  // Collect this instance's present cards in from-the-edge stacking order. The "primary"
+  // coordinate is the distance along the stacking direction from the anchored edge,
+  // matching collapseStack(): for bottom stacking it is measured from the placement bottom.
+  struct Item {
+    std::size_t index;
+    float primary;
+    float sharedHeight;
+  };
+  std::vector<Item> items;
+  items.reserve(m_entries.size());
+  for (std::size_t i = 0; i < m_entries.size(); ++i) {
+    const auto& entry = m_entries[i];
+    if (!hasPlacement(entry)) {
+      continue;
+    }
+    if (i >= inst.cards.size() || inst.cards[i].cardNode == nullptr) {
+      continue;
+    }
+    const float primary = bottom ? (placementBottom - (entry.y + entry.height)) : entry.y;
+    items.push_back({i, primary, entry.height});
   }
-  return entry.y;
+  if (items.empty()) {
+    return bottom ? layoutBottom : paddingTop(scale);
+  }
+  std::sort(items.begin(), items.end(), [](const Item& a, const Item& b) { return a.primary < b.primary; });
+
+  float cursor = items.front().primary;
+  for (std::size_t k = 0; k < items.size(); ++k) {
+    const float realHeight = inst.cards[items[k].index].clipHeight;
+    if (items[k].index == entryIndex) {
+      return bottom ? (layoutBottom - cursor - realHeight) : cursor;
+    }
+    // Preserve the gap the shared skeleton placed after this card (kGap normally, larger
+    // when hover or a dismissed-but-not-collapsed slot left extra space), but advance by
+    // the real height so the next card sits exactly below/above the previous one.
+    float gapAfter = layoutGap;
+    if (k + 1 < items.size()) {
+      gapAfter = std::max(layoutGap, items[k + 1].primary - (items[k].primary + items[k].sharedHeight));
+    }
+    cursor += realHeight + gapAfter;
+  }
+  return bottom ? (layoutBottom - cursor) : cursor;
 }
 
 float NotificationToast::maxPlacementBottom() const {
@@ -1685,8 +1736,7 @@ void NotificationToast::collapseStack() {
         cs.slideAnimId = 0;
       }
 
-      const float surfH = static_cast<float>(inst->surface->height());
-      const float newSurfY = entryYForSurface(m_entries[p.index], surfH);
+      const float newSurfY = cardSurfaceY(*inst, p.index);
 
       // The completion callbacks must NOT capture `cs` by reference: a sibling
       // card's finishRemoval() can erase an earlier slot in inst->cards while this
@@ -1697,10 +1747,10 @@ void NotificationToast::collapseStack() {
       const uint32_t entryId = m_entries[p.index].notificationId;
 
       if (cs.entryAnimId != 0) {
-        const float currentReveal = cardReveal(cs, m_entries[p.index].height);
+        const float currentReveal = cardReveal(cs, cs.clipHeight);
         inst->animations.cancel(cs.entryAnimId);
         cs.entryAnimId = 0;
-        const float cardHeight = m_entries[p.index].height;
+        const float cardHeight = cs.clipHeight;
         Node* viewport = cs.cardNode;
         Node* content = cs.cardContent;
         Node* foreground = cs.cardForeground;

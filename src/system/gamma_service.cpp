@@ -128,6 +128,8 @@ bool GammaService::effectiveForce() const {
   return m_config.force;
 }
 
+bool GammaService::networkLocationConfigured() const { return m_location.autoLocate || !m_location.address.empty(); }
+
 void GammaService::scheduleManualTimer() {
   const auto boundaryDelay =
       day_night_schedule::evaluate(m_location, m_resolvedLatitude, m_resolvedLongitude).untilBoundary;
@@ -412,10 +414,10 @@ int GammaService::targetTemperature() const {
 
   const auto coords = day_night_schedule::resolveCoordinates(m_location, m_resolvedLatitude, m_resolvedLongitude);
   if (!coords.latitude.has_value() || !coords.longitude.has_value()) {
-    if (m_location.latitude.has_value() != m_location.longitude.has_value()) {
-      kLog.warn("need both latitude and longitude for manual location");
-    } else if (m_locationResolving) {
+    if (m_locationResolving || networkLocationConfigured()) {
       kLog.debug("night light schedule waiting for location resolution");
+    } else if (m_location.latitude.has_value() != m_location.longitude.has_value()) {
+      kLog.warn("need both latitude and longitude for manual location");
     } else {
       kLog.warn("no schedule: enable auto-locate, set an address, or set latitude/longitude or sunset/sunrise");
     }

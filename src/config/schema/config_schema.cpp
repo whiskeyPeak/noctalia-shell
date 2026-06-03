@@ -218,6 +218,26 @@ namespace noctalia::config::schema {
   }
 
   namespace {
+    const Schema<DesktopWidgetsGridState>& desktopWidgetsGridSchema() {
+      static const Schema<DesktopWidgetsGridState> s = {
+          field(&DesktopWidgetsGridState::visible, "visible"),
+          field(&DesktopWidgetsGridState::cellSize, "cell_size", Range<std::int64_t>{8, 256}),
+          field(&DesktopWidgetsGridState::majorInterval, "major_interval", Range<std::int64_t>{1, 16}),
+      };
+      return s;
+    }
+  } // namespace
+
+  const Schema<DesktopWidgetsConfig>& desktopWidgetsSchema() {
+    static const Schema<DesktopWidgetsConfig> s = {
+        field(&DesktopWidgetsConfig::enabled, "enabled"),
+        field(&DesktopWidgetsConfig::schemaVersion, "schema_version"),
+        subTable(&DesktopWidgetsConfig::grid, "grid", desktopWidgetsGridSchema()),
+    };
+    return s;
+  }
+
+  namespace {
     const Schema<BrightnessMonitorOverride>& brightnessMonitorSchema() {
       static const Schema<BrightnessMonitorOverride> s = {
           field(&BrightnessMonitorOverride::match, "match"),
@@ -1162,6 +1182,9 @@ namespace noctalia::config::schema {
       if (section == "dock") {
         return chk(dockSchema());
       }
+      if (section == "desktop_widgets") {
+        return chk(desktopWidgetsSchema());
+      }
       if (section == "control_center") {
         return chk(controlCenterSchema());
       }
@@ -1182,6 +1205,25 @@ namespace noctalia::config::schema {
       }
       cur->insert_or_assign(path.back(), 0); // dummy leaf
       return root;
+    }
+
+    bool isKnownDesktopWidgetPath(const std::vector<std::string>& path) {
+      if (path.size() == 2 && path[1] == "widget_order") {
+        return true;
+      }
+      if (path.size() < 2 || path[1] != "widget") {
+        return false;
+      }
+      if (path.size() <= 3) {
+        return true;
+      }
+      static const std::unordered_set<std::string> kWidgetKeys = {
+          "id", "type", "output", "cx", "cy", "scale", "rotation", "enabled", "settings",
+      };
+      if (!kWidgetKeys.contains(path[3])) {
+        return false;
+      }
+      return path.size() == 4 || path[3] == "settings";
     }
   } // namespace
 
@@ -1212,6 +1254,10 @@ namespace noctalia::config::schema {
       std::vector<std::string> unknown;
       collectUnknownKeys(nestedFromPath(path, 2), barFieldsSchema(), "bar", unknown);
       return unknown.empty();
+    }
+
+    if (section == "desktop_widgets" && isKnownDesktopWidgetPath(path)) {
+      return true;
     }
 
     if (path.size() < 2) {

@@ -97,6 +97,10 @@ private:
       Node* actionsRowNode = nullptr;
       Node* inlineReplyRowNode = nullptr;
       Input* inlineReplyInput = nullptr;
+      // Real laid-out card height for this instance, measured at this surface's render
+      // scale in buildCard(). The reveal clip uses this, not the shared entry.height,
+      // which is measured once at whatever scale was current on arrival.
+      float clipHeight = 0.0f;
       AnimationManager::Id countdownAnimId = 0;
       AnimationManager::Id entryAnimId = 0;
       AnimationManager::Id slideAnimId = 0;
@@ -165,7 +169,11 @@ private:
   [[nodiscard]] float layoutBottomForSurfaceHeight(float surfaceHeight) const;
   [[nodiscard]] float maxPlacementBottom() const;
   [[nodiscard]] float entryOffsetFromPlacementBottom(const PopupEntry& entry) const;
-  [[nodiscard]] float entryYForSurface(const PopupEntry& entry, float surfaceHeight) const;
+  // Resting surface Y for one instance's card, packed from the stacking edge using this
+  // instance's real per-card heights (CardState::clipHeight). Inter-card gaps are taken
+  // from the shared placement skeleton, so hover spacing and dismiss gaps are preserved,
+  // but heights are per-monitor real values so cards never overlap or leave height-mismatch gaps.
+  [[nodiscard]] float cardSurfaceY(const Instance& inst, std::size_t entryIndex) const;
   void alignBottomStackToPlacementBottom();
   [[nodiscard]] std::optional<float>
   findPlacementY(float entryHeight, std::optional<uint32_t> ignoreNotificationId = std::nullopt) const;

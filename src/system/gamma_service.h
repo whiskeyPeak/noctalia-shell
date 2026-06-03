@@ -51,6 +51,7 @@ private:
   [[nodiscard]] bool effectiveConfiguredEnabled() const;
   [[nodiscard]] bool effectiveEnabled() const;
   [[nodiscard]] bool effectiveForce() const;
+  [[nodiscard]] bool networkLocationConfigured() const;
 
   void scheduleManualTimer();
   void scheduleGeoTimer();

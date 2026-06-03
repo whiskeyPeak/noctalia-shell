@@ -18,6 +18,7 @@ namespace noctalia::config::schema {
   const Schema<LocationConfig>& locationSchema();
   const Schema<NotificationConfig>& notificationSchema();
   const Schema<DockConfig>& dockSchema();
+  const Schema<DesktopWidgetsConfig>& desktopWidgetsSchema();
   const Schema<BrightnessConfig>& brightnessSchema();
   const Schema<BatteryConfig>& batterySchema();
   const Schema<ControlCenterConfig>& controlCenterSchema();

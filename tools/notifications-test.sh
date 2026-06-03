@@ -2,6 +2,9 @@
 
 echo "Sending test notifications..."
 
+notify-send "Notification #0 (#💻-development very long summary)" "I’m excited to mess around with this bad boy"
+sleep 0.5
+
 notify-send "Notification #1" "A 'low' urgency notification" -u low
 sleep 0.5
 
