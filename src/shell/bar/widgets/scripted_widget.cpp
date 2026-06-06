@@ -27,7 +27,9 @@
 #include <linux/input-event-codes.h>
 #include <optional>
 #include <sstream>
+#include <type_traits>
 #include <unordered_set>
+#include <variant>
 #include <vector>
 
 namespace {
@@ -119,6 +121,78 @@ namespace {
     std::stringstream ss;
     ss << f.rdbuf();
     return ss.str();
+  }
+
+  std::string escapeRuntimeKeyToken(std::string_view token) {
+    std::string out;
+    out.reserve(token.size());
+    for (char ch : token) {
+      if (ch == '\\' || ch == '|' || ch == '=' || ch == ',' || ch == ':') {
+        out.push_back('\\');
+      }
+      out.push_back(ch);
+    }
+    return out;
+  }
+
+  std::string encodeRuntimeSettingValue(const WidgetSettingValue& value) {
+    return std::visit(
+        [](const auto& concrete) -> std::string {
+          using T = std::decay_t<decltype(concrete)>;
+          if constexpr (std::is_same_v<T, bool>) {
+            return std::string("b:") + (concrete ? "1" : "0");
+          } else if constexpr (std::is_same_v<T, std::int64_t>) {
+            return std::string("i:") + std::to_string(concrete);
+          } else if constexpr (std::is_same_v<T, double>) {
+            std::ostringstream out;
+            out << "d:" << std::setprecision(17) << concrete;
+            return out.str();
+          } else if constexpr (std::is_same_v<T, std::string>) {
+            return std::string("s:") + escapeRuntimeKeyToken(concrete);
+          } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            std::ostringstream out;
+            out << "v:" << concrete.size() << ':';
+            for (std::size_t i = 0; i < concrete.size(); ++i) {
+              if (i != 0) {
+                out << ',';
+              }
+              out << escapeRuntimeKeyToken(concrete[i]);
+            }
+            return out.str();
+          } else {
+            return std::string{};
+          }
+        },
+        value
+    );
+  }
+
+  std::string buildSharedScriptRuntimeKey(
+      std::string_view baseKey, std::string_view scriptPath, const scripting::ScriptWidgetSettings& settings
+  ) {
+    std::vector<std::string> settingKeys;
+    settingKeys.reserve(settings.size());
+    for (const auto& [key, value] : settings) {
+      (void)value;
+      settingKeys.push_back(key);
+    }
+    std::sort(settingKeys.begin(), settingKeys.end());
+
+    std::ostringstream out;
+    out << "base=" << escapeRuntimeKeyToken(baseKey) << "|script=" << escapeRuntimeKeyToken(scriptPath)
+        << "|settings=";
+    for (std::size_t i = 0; i < settingKeys.size(); ++i) {
+      if (i != 0) {
+        out << '|';
+      }
+      const auto& key = settingKeys[i];
+      const auto it = settings.find(key);
+      if (it == settings.end()) {
+        continue;
+      }
+      out << escapeRuntimeKeyToken(key) << '=' << encodeRuntimeSettingValue(it->second);
+    }
+    return out.str();
   }
 
 } // namespace
@@ -236,8 +310,10 @@ void ScriptedWidget::create() {
 
   bool createdRuntime = true;
   if (m_sharedScope) {
+    const std::string sharedRuntimeKey =
+      buildSharedScriptRuntimeKey(m_widgetConfigName, m_resolvedPath.string(), m_settings);
     auto acquired =
-        scripting::SharedScriptRuntimeRegistry::acquire(m_widgetConfigName, m_settings, m_scriptApi, m_clipboard);
+      scripting::SharedScriptRuntimeRegistry::acquire(sharedRuntimeKey, m_settings, m_scriptApi, m_clipboard);
     m_runtime = std::move(acquired.runtime);
     createdRuntime = acquired.created;
   } else {
