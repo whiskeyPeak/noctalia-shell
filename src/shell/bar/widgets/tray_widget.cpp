@@ -109,8 +109,8 @@ namespace {
     // 2) Opaque monochrome bitmaps/SVG rasterizations, where luminance polarity
     //    (light-on-dark vs dark-on-light) must be converted into alpha.
     std::size_t transparentPixels = 0;
-    double lumSum = 0.0;
-    double alphaWeight = 0.0;
+    float lumSum = 0.0f;
+    float alphaWeight = 0.0f;
     const std::size_t pixelCount = loaded->rgba.size() / 4U;
     for (std::size_t i = 0; i + 3 < loaded->rgba.size(); i += 4) {
       const std::uint8_t a = loaded->rgba[i + 3];
@@ -118,20 +118,20 @@ namespace {
         ++transparentPixels;
         continue;
       }
-      const double lum = (static_cast<double>(loaded->rgba[i]) * 0.299
-                          + static_cast<double>(loaded->rgba[i + 1]) * 0.587
-                          + static_cast<double>(loaded->rgba[i + 2]) * 0.114)
-          / 255.0;
-      const double w = static_cast<double>(a) / 255.0;
+      const float lum = (static_cast<float>(loaded->rgba[i]) * 0.299f
+                         + static_cast<float>(loaded->rgba[i + 1]) * 0.587f
+                         + static_cast<float>(loaded->rgba[i + 2]) * 0.114f)
+          / 255.0f;
+      const float w = static_cast<float>(a) / 255.0f;
       lumSum += lum * w;
       alphaWeight += w;
     }
 
-    const double transparentRatio =
-        pixelCount == 0 ? 0.0 : static_cast<double>(transparentPixels) / static_cast<double>(pixelCount);
-    const bool useSourceAlphaMask = transparentRatio > 0.10;
-    const double avgLum = alphaWeight > 0.0 ? lumSum / alphaWeight : 0.0;
-    const bool invertLumaMask = avgLum > 0.5;
+    const float transparentRatio =
+        pixelCount == 0 ? 0.0f : static_cast<float>(transparentPixels) / static_cast<float>(pixelCount);
+    const bool useSourceAlphaMask = transparentRatio > 0.10f;
+    const float avgLum = alphaWeight > 0.0f ? lumSum / alphaWeight : 0.0f;
+    const bool invertLumaMask = avgLum > 0.5f;
 
     for (std::size_t i = 0; i + 3 < loaded->rgba.size(); i += 4) {
       const std::uint8_t a = loaded->rgba[i + 3];
