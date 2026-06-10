@@ -474,6 +474,7 @@ _noctalia_sources = files(
   'src/scripting/plugin_manifest.cpp',
   'src/scripting/plugin_registry.cpp',
   'src/scripting/plugin_service_host.cpp',
+  'src/scripting/plugin_source_locks.cpp',
   'src/scripting/plugin_source_paths.cpp',
   'src/scripting/plugin_state_store.cpp',
   'src/scripting/script_runtime.cpp',
@@ -958,6 +959,16 @@ plugin_source_paths_test = executable('plugin_source_paths_test',
 )
 
 test('plugin_source_paths', plugin_source_paths_test)
+
+plugin_source_locks_test = executable('plugin_source_locks_test',
+  sources: files(
+    'tests/plugin_source_locks_test.cpp',
+    'src/scripting/plugin_source_locks.cpp',
+  ),
+  include_directories: _noctalia_inc,
+)
+
+test('plugin_source_locks', plugin_source_locks_test)
 
 plugin_git_export_test = executable('plugin_git_export_test',
   sources: files(

@@ -7,6 +7,7 @@
 #include "scripting/plugin_git.h"
 #include "scripting/plugin_id.h"
 #include "scripting/plugin_manifest.h"
+#include "scripting/plugin_source_locks.h"
 #include "scripting/plugin_source_paths.h"
 #include "util/file_utils.h"
 
@@ -154,6 +155,7 @@ namespace scripting {
     if (dest.empty()) {
       return {.ok = false, .error = "empty plugin source repo path", .entries = {}};
     }
+    auto sourceLock = plugin_source_locks::acquire(source.name);
     std::error_code ec;
     if (!std::filesystem::exists(dest / ".git", ec)) {
       std::filesystem::create_directories(dest.parent_path(), ec);

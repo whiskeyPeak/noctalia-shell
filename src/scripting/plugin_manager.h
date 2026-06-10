@@ -89,8 +89,8 @@ namespace scripting {
     // Plugin ids offered by the implicit local dev source.
     [[nodiscard]] std::unordered_set<std::string> localPluginIds() const;
     // Re-derive any enabled git-source plugin missing from disk — re-clones a wiped
-    // source repo and exports enabled plugins it ships. Heals a deleted repo or a
-    // restored config. Returns whether anything was materialized. No network when
+    // source repo and exports enabled plugins it ships. Heals deleted source storage
+    // or a restored config. Returns whether anything was exported. No network when
     // nothing is missing.
     bool ensureEnabledMaterialized(const PluginsConfig& plugins) const;
 

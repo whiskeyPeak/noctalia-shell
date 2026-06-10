@@ -10,10 +10,12 @@
 #include "scripting/plugin_id.h"
 #include "scripting/plugin_manifest.h"
 #include "scripting/plugin_registry.h"
+#include "scripting/plugin_source_locks.h"
 #include "scripting/plugin_source_paths.h"
 #include "util/file_utils.h"
 #include "util/string_utils.h"
 
+#include <optional>
 #include <system_error>
 #include <thread>
 #include <unordered_set>
@@ -26,6 +28,24 @@ namespace scripting {
     constexpr Logger kLog("plugins");
 
     std::filesystem::path sourceRootFor(const PluginSourceConfig& source) { return plugin_paths::registryRoot(source); }
+
+    void removeManagedGitSourceStorage(const PluginSourceConfig& source) {
+      const std::string sourceBase = FileUtils::pluginSourcesDir();
+      if (!sourceBase.empty()) {
+        (void)plugin_paths::removeTreeUnder(plugin_paths::sourceStorageRoot(source), sourceBase);
+      }
+      const std::string materializedBase = FileUtils::pluginMaterializedDir();
+      if (!materializedBase.empty()) {
+        (void)plugin_paths::removeTreeUnder(plugin_paths::gitMaterializedRoot(source), materializedBase);
+      }
+    }
+
+    bool sourceReplacementInvalidatesGitStorage(const PluginSourceConfig& previous, const PluginSourceConfig& next) {
+      if (previous.kind == PluginSourceKind::Git && next.kind == PluginSourceKind::Git) {
+        return previous.location != next.location;
+      }
+      return previous.kind == PluginSourceKind::Git || next.kind == PluginSourceKind::Git;
+    }
 
     std::filesystem::path materializedPluginDir(const PluginSourceConfig& source, std::string_view pluginId) {
       const auto subdir = pluginSubdirFromId(pluginId);
@@ -248,6 +268,7 @@ namespace scripting {
       if (repoRoot.empty()) {
         continue;
       }
+      auto sourceLock = plugin_source_locks::acquire(source.name);
       if (!std::filesystem::exists(repoRoot / ".git", ec)) {
         // Source repo is gone (e.g. the state dir was wiped). Re-clone it (metadata
         // only); the per-plugin export below writes what's enabled.
@@ -297,8 +318,8 @@ namespace scripting {
     if (m_applied && pc == m_lastApplied) {
       return;
     }
-    // Heal a wiped clone / restored config once at startup (the clone state does
-    // not change on later config reloads, so don't re-touch the network then).
+    // Heal wiped source storage / restored config once at startup. Source storage
+    // does not change on later config reloads, so don't re-touch the network then.
     if (!m_applied) {
       ensureEnabledMaterialized(pc);
     }
@@ -325,6 +346,7 @@ namespace scripting {
       std::filesystem::path manifestDir = root / *subdir;
       std::optional<PluginManifest> materializedManifest;
       if (source->kind == PluginSourceKind::Git) {
+        auto sourceLock = plugin_source_locks::acquire(source->name);
         const std::filesystem::path repoRoot = plugin_paths::gitRepoRoot(*source);
         const auto materialized = materializeGitPlugin(*source, repoRoot, "HEAD", id);
         if (!materialized) {
@@ -410,6 +432,12 @@ namespace scripting {
       return;
     }
     kLog.info("adding plugin source '{}' ({})", source.name, source.location);
+    if (const auto previous = findSource(source.name);
+        previous.has_value() && sourceReplacementInvalidatesGitStorage(*previous, source)) {
+      auto sourceLock = plugin_source_locks::acquire(source.name);
+      kLog.info("plugin source '{}' changed; deleting app-managed git storage", source.name);
+      removeManagedGitSourceStorage(source);
+    }
     m_config.addPluginSource(source); // fires reload -> refresh re-injects the registry
   }
 
@@ -438,6 +466,7 @@ namespace scripting {
     // back to the main thread. `this` is an Application member, so it outlives the worker.
     std::thread([this, source = *source, repoRoot, sourceName = std::move(sourceName),
                  enabled = std::move(enabled)]() mutable {
+      auto sourceLock = plugin_source_locks::acquire(source.name);
       const auto fetched = plugin_git::fetch(repoRoot);
       if (!fetched) {
         DeferredCall::callLater([sourceName, err = fetched.err]() {
@@ -511,20 +540,17 @@ namespace scripting {
       return;
     }
     kLog.info("removing plugin source '{}'", sourceName);
+    std::optional<plugin_source_locks::SourceLock> sourceLock;
+    if (source->kind == PluginSourceKind::Git) {
+      sourceLock.emplace(plugin_source_locks::acquire(source->name));
+    }
 
     // Disable this source's plugins so no stale enabled ids linger.
     for (const auto& entry : discoverCatalog(*source).entries) {
       m_config.setPluginEnabled(entry.id, false);
     }
     if (source->kind == PluginSourceKind::Git) {
-      const std::string sourceBase = FileUtils::pluginSourcesDir();
-      if (!sourceBase.empty()) {
-        (void)plugin_paths::removeTreeUnder(plugin_paths::sourceStorageRoot(*source), sourceBase);
-      }
-      const std::string materializedBase = FileUtils::pluginMaterializedDir();
-      if (!materializedBase.empty()) {
-        (void)plugin_paths::removeTreeUnder(plugin_paths::gitMaterializedRoot(*source), materializedBase);
-      }
+      removeManagedGitSourceStorage(*source);
     }
     m_config.removePluginSource(sourceName); // fires reload -> refresh re-injects
   }
