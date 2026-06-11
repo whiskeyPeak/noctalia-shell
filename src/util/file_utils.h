@@ -96,17 +96,33 @@ namespace FileUtils {
   }
 
   [[nodiscard]] inline std::vector<std::uint8_t> readBinaryFile(const std::string& path) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (path.empty()) {
+      return {};
+    }
+
+    std::error_code ec;
+    const std::filesystem::path fsPath = expandUserPath(path);
+    if (!std::filesystem::is_regular_file(fsPath, ec) || ec) {
+      return {};
+    }
+
+    const std::uintmax_t fileSize = std::filesystem::file_size(fsPath, ec);
+    if (ec || fileSize == 0) {
+      return {};
+    }
+
+    constexpr std::uintmax_t kMaxBinaryReadBytes = 256ULL * 1024ULL * 1024ULL;
+    if (fileSize > kMaxBinaryReadBytes) {
+      return {};
+    }
+
+    std::ifstream file(fsPath, std::ios::binary);
     if (!file) {
       return {};
     }
-    const auto size = file.tellg();
-    if (size <= 0) {
-      return {};
-    }
-    std::vector<std::uint8_t> data(static_cast<std::size_t>(size));
-    file.seekg(0);
-    file.read(reinterpret_cast<char*>(data.data()), size);
+
+    std::vector<std::uint8_t> data(static_cast<std::size_t>(fileSize));
+    file.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(fileSize));
     if (!file) {
       return {};
     }
