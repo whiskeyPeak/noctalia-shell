@@ -1,6 +1,7 @@
 Checks: >-
   -clang-diagnostic-*,
   modernize-raw-string-literal,
+  modernize-use-starts-ends-with,
   modernize-use-std-numbers,
   performance-move-const-arg,
   readability-container-contains,

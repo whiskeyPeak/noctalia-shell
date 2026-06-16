@@ -1227,7 +1227,7 @@ namespace noctalia::theme {
           {"$XDG_CACHE_HOME", "XDG_CACHE_HOME", ".cache"},
       }};
       for (const XdgBase& b : kBases) {
-        if (path.rfind(b.token, 0) != 0)
+        if (!path.starts_with(b.token))
           continue;
         if (path.size() != b.token.size() && path[b.token.size()] != '/')
           continue;

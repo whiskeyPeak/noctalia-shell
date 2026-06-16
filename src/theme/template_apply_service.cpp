@@ -23,7 +23,7 @@ namespace noctalia::theme {
     std::filesystem::path builtinTemplateConfigPath() { return paths::assetPath("templates/builtin.toml"); }
 
     std::string schemeTypeFromConfig(const ThemeConfig& theme) {
-      if (theme.wallpaperScheme.rfind("m3-", 0) == 0)
+      if (theme.wallpaperScheme.starts_with("m3-"))
         return theme.wallpaperScheme.substr(3);
       return theme.wallpaperScheme;
     }
