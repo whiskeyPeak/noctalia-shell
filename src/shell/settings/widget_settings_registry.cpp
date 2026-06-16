@@ -137,7 +137,13 @@ namespace settings {
       if (type == "wallpaper") {
         return nonEmptyGlyph(config->getString("glyph", "wallpaper-selector"), "wallpaper-selector");
       }
+      if (type == "keyboard_layout") {
+        return nonEmptyGlyph(config->getString("glyph", "keyboard"), "keyboard");
+      }
       if (type == "sysmon") {
+        if (const std::string custom = config->getString("glyph", ""); !custom.empty()) {
+          return custom;
+        }
         const std::string stat = config->getString("stat", "cpu_usage");
         if (stat == "cpu_temp") {
           return "cpu-temperature";
@@ -677,6 +683,11 @@ namespace settings {
       add(stringSpec("cycle_command"));
       add(boolSpec("hide_when_single_layout", false));
       add(boolSpec("show_icon", true));
+      {
+        auto glyph = glyphSpec("glyph", "keyboard");
+        glyph.visibleWhen = WidgetSettingVisibility{"show_icon", {"true"}};
+        add(std::move(glyph));
+      }
       add(boolSpec("show_label", true));
       {
         auto display = segmentedSpec("display", "short", shortFull);
@@ -754,6 +765,11 @@ namespace settings {
       add(intSpec("length", 20, 0.0, 400.0, 1.0));
     } else if (type == "sysmon") {
       add(selectSpec("stat", "cpu_usage", sysmonStats));
+      {
+        auto glyph = glyphSpec("glyph", "");
+        glyph.descriptionKey = "settings.widgets.settings.glyph.sysmon-description";
+        add(std::move(glyph));
+      }
       {
         auto path = stringSpec("path", "/");
         path.visibleWhen = WidgetSettingVisibility{"stat", {"disk_pct"}};

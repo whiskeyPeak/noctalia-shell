@@ -1126,6 +1126,7 @@ namespace noctalia::config::schema {
           enumField(&ShellConfig::PanelConfig::controlCenterPlacement, "control_center_placement", kPanelPlacements),
           enumField(&ShellConfig::PanelConfig::wallpaperPlacement, "wallpaper_placement", kPanelPlacements),
           enumField(&ShellConfig::PanelConfig::sessionPlacement, "session_placement", kPanelPlacements),
+          field(&ShellConfig::PanelConfig::floatingOffset, "floating_offset", Range<std::int64_t>{0, 100}),
           field(&ShellConfig::PanelConfig::openNearClickControlCenter, "open_near_click_control_center"),
           field(&ShellConfig::PanelConfig::openNearClickLauncher, "open_near_click_launcher"),
           field(&ShellConfig::PanelConfig::openNearClickClipboard, "open_near_click_clipboard"),

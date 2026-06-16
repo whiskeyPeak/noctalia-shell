@@ -931,6 +931,18 @@ namespace settings {
         ToggleSetting{cfg.shell.panel.shadow}, "shadow depth"
     ));
     entries.push_back(makeEntry(
+        SettingsSection::Panels, "effects", tr("settings.schema.panels.floating-offset.label"),
+        tr("settings.schema.panels.floating-offset.description"), {"shell", "panel", "floating_offset"},
+        StepperSetting{
+            .value = static_cast<int>(cfg.shell.panel.floatingOffset),
+            .minValue = 0,
+            .maxValue = 100,
+            .step = 1,
+            .valueSuffix = "px",
+        },
+        "floating detached panel gap offset distance bar"
+    ));
+    entries.push_back(makeEntry(
         SettingsSection::Panels, "control-center", tr("settings.schema.panels.placement-control-center.label"),
         tr("settings.schema.panels.placement-control-center.description"),
         {"shell", "panel", "control_center_placement"},

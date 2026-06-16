@@ -1043,7 +1043,7 @@ struct BrightnessService::Impl {
         .writeEpoch = display.ddcWriteEpoch,
         .displayId = display.pub.id,
         .bus = display.ddcBus,
-        .targetRaw = static_cast<int>(std::round(value * 100.0f)),
+        .targetRaw = static_cast<int>(std::round(value * static_cast<float>(display.maxRaw))),
         .maxRaw = display.maxRaw,
     };
 
@@ -1139,7 +1139,7 @@ struct BrightnessService::Impl {
         args.emplace_back("--noverify");
         args.emplace_back("setvcp");
         args.emplace_back("10");
-        args.push_back(std::to_string(std::clamp(writeJob->targetRaw, 0, 100)));
+        args.push_back(std::to_string(std::clamp(writeJob->targetRaw, 0, std::max(1, writeJob->maxRaw))));
 
         const CommandResult result = runCommandCapture(args, kDdcSetTimeout);
         completion.timedOut = result.timedOut;

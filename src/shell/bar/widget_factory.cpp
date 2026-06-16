@@ -281,9 +281,13 @@ std::unique_ptr<Widget> WidgetFactory::create(
     const bool hideWhenSingleLayout = wc != nullptr ? wc->getBool("hide_when_single_layout", false) : false;
     auto customLabels =
         wc != nullptr ? wc->getStringMap("custom_labels") : std::unordered_map<std::string, std::string>{};
+    std::string glyph = wc != nullptr ? wc->getString("glyph", "keyboard") : std::string{"keyboard"};
+    if (glyph.empty()) {
+      glyph = "keyboard";
+    }
     auto widget = std::make_unique<KeyboardLayoutWidget>(
         m_platform, cycleCommand, KeyboardLayoutWidget::parseDisplayMode(display), showIcon, showLabel,
-        hideWhenSingleLayout, std::move(customLabels)
+        hideWhenSingleLayout, std::move(customLabels), std::move(glyph)
     );
     widget->setContentScale(contentScale);
     return widget;
@@ -492,9 +496,10 @@ std::unique_ptr<Widget> WidgetFactory::create(
               "highlight_color", colorSpecFromRole(ColorRole::Error), "widget." + name + ".highlight_color"
           )
         : colorSpecFromRole(ColorRole::Error);
+    std::string glyph = wc != nullptr ? wc->getString("glyph", "") : std::string{};
     auto widget = std::make_unique<SysmonWidget>(
         m_sysmon, output, stat, std::move(path), displayMode, highlightColor, m_configService, networkInterface,
-        showLabel, labelMinWidth
+        showLabel, labelMinWidth, std::move(glyph)
     );
     widget->setContentScale(contentScale);
     return widget;

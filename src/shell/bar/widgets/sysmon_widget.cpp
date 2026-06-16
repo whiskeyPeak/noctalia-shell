@@ -106,11 +106,12 @@ namespace {
 SysmonWidget::SysmonWidget(
     SystemMonitorService* monitor, wl_output* /*output*/, SysmonStat stat, std::string diskPath,
     SysmonDisplayMode displayMode, ColorSpec highlightColor, ConfigService& configService, std::string networkInterface,
-    bool showLabel, float labelMinWidth
+    bool showLabel, float labelMinWidth, std::string glyph
 )
     : m_monitor(monitor), m_stat(stat), m_displayMode(displayMode), m_highlightColor(highlightColor),
       m_configService(configService), m_showLabel(showLabel), m_labelMinWidth(labelMinWidth),
-      m_diskPath(std::move(diskPath)), m_networkInterface(std::move(networkInterface)) {
+      m_diskPath(std::move(diskPath)), m_networkInterface(std::move(networkInterface)),
+      m_glyphOverride(std::move(glyph)) {
   if (m_monitor != nullptr) {
     if (needsCpuTemp(m_stat)) {
       m_monitor->retainCpuTemp();
@@ -159,7 +160,7 @@ void SysmonWidget::create() {
   container->addChild(
       ui::glyph({
           .out = &m_glyph,
-          .glyph = glyphName(m_stat),
+          .glyph = m_glyphOverride.empty() ? glyphName(m_stat) : m_glyphOverride,
           .glyphSize = Style::baseGlyphSize * m_contentScale,
           .color = widgetIconColorOr(colorSpecFromRole(ColorRole::OnSurface)),
       })

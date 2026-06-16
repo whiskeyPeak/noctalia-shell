@@ -2516,12 +2516,16 @@ bool Bar::onPointerEvent(const PointerEvent& event) {
       break;
     }
     m_hoveredInstance = it->second;
-    m_hoveredInstance->lastPointerSx = static_cast<float>(event.sx);
-    m_hoveredInstance->lastPointerSy = static_cast<float>(event.sy);
-    m_hoveredInstance->pointerInside = true;
-    m_hoveredInstance->inputDispatcher.pointerEnter(
-        static_cast<float>(event.sx), static_cast<float>(event.sy), event.serial
-    );
+    BarInstance* const entered = m_hoveredInstance;
+    entered->lastPointerSx = static_cast<float>(event.sx);
+    entered->lastPointerSy = static_cast<float>(event.sy);
+    entered->pointerInside = true;
+    entered->inputDispatcher.pointerEnter(static_cast<float>(event.sx), static_cast<float>(event.sy), event.serial);
+    // pointerEnter can re-enter the Wayland event loop (tooltip popup work),
+    // which may clear or change m_hoveredInstance before we dereference it.
+    if (m_hoveredInstance != entered) {
+      break;
+    }
     if (m_hoveredInstance->barConfig.autoHide && m_hoveredInstance->sceneRoot != nullptr) {
       revealAutoHideBar(*m_hoveredInstance);
     }
@@ -2543,9 +2547,15 @@ bool Bar::onPointerEvent(const PointerEvent& event) {
   case PointerEvent::Type::Motion: {
     if (m_hoveredInstance == nullptr)
       break;
-    m_hoveredInstance->lastPointerSx = static_cast<float>(event.sx);
-    m_hoveredInstance->lastPointerSy = static_cast<float>(event.sy);
-    m_hoveredInstance->inputDispatcher.pointerMotion(static_cast<float>(event.sx), static_cast<float>(event.sy), 0);
+    BarInstance* const hovered = m_hoveredInstance;
+    hovered->lastPointerSx = static_cast<float>(event.sx);
+    hovered->lastPointerSy = static_cast<float>(event.sy);
+    hovered->inputDispatcher.pointerMotion(static_cast<float>(event.sx), static_cast<float>(event.sy), 0);
+    // pointerMotion can re-enter the Wayland event loop (tooltip popup work),
+    // which may clear or change m_hoveredInstance before we dereference it.
+    if (m_hoveredInstance != hovered) {
+      break;
+    }
     break;
   }
   case PointerEvent::Type::Button: {

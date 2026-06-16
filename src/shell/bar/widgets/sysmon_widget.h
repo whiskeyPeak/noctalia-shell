@@ -41,7 +41,7 @@ public:
   SysmonWidget(
       SystemMonitorService* monitor, wl_output* output, SysmonStat stat, std::string diskPath,
       SysmonDisplayMode displayMode, ColorSpec highlightColor, ConfigService& configService,
-      std::string networkInterface = {}, bool showLabel = true, float labelMinWidth = 0.0f
+      std::string networkInterface = {}, bool showLabel = true, float labelMinWidth = 0.0f, std::string glyph = {}
   );
   ~SysmonWidget() override;
 
@@ -79,6 +79,7 @@ private:
   float m_labelMinWidth = 0.0f;
   std::string m_diskPath;
   std::string m_networkInterface;
+  std::string m_glyphOverride;
   std::string m_lastRawValue;
   bool m_isVerticalBar = false;
   bool m_lastLabelVertical = false;

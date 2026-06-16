@@ -208,6 +208,7 @@ void LockscreenWidgetsHost::createInstance(
 
   widget->create();
   widget->setBox(state.boxWidth, state.boxHeight);
+  m_renderContext->makeCurrent(surface.renderTarget());
   widget->update(*m_renderContext);
   widget->layout(*m_renderContext);
 
@@ -241,8 +242,9 @@ void LockscreenWidgetsHost::createInstance(
       rawInstance->surface->requestRedraw();
     }
   });
-  instance->widget->setFrameTickRequestCallback([rawInstance]() {
+  instance->widget->setFrameTickRequestCallback([this, rawInstance]() {
     if (rawInstance->surface != nullptr) {
+      syncSurfaceFrameTick(rawInstance->surface);
       rawInstance->surface->requestFrameTick();
     }
   });
@@ -276,10 +278,10 @@ void LockscreenWidgetsHost::syncSurfaceFrameTick(LockSurface* surfacePtr) {
     return;
   }
 
-  const bool needsFrameTick = std::any_of(m_instances.begin(), m_instances.end(), [&](const auto& instance) {
-    return instance->surface == surfacePtr && instance->widget != nullptr && instance->widget->needsFrameTick();
+  const bool hasWidgets = std::any_of(m_instances.begin(), m_instances.end(), [&](const auto& instance) {
+    return instance->surface == surfacePtr && instance->widget != nullptr;
   });
-  if (!needsFrameTick) {
+  if (!hasWidgets) {
     surfacePtr->setFrameTickCallback(nullptr);
     return;
   }
@@ -290,11 +292,27 @@ void LockscreenWidgetsHost::syncSurfaceFrameTick(LockSurface* surfacePtr) {
       return;
     }
     host->m_renderContext->makeCurrent(surfacePtr->renderTarget());
+
+    bool needsRedraw = false;
+    for (auto& instance : host->m_instances) {
+      if (instance->surface != surfacePtr) {
+        continue;
+      }
+      instance->animations.tick(deltaMs);
+      needsRedraw = needsRedraw || instance->animations.hasActive();
+    }
+
+    bool needsContinuousRedraw = needsRedraw;
     for (auto& instance : host->m_instances) {
       if (instance->surface != surfacePtr || instance->widget == nullptr || !instance->widget->needsFrameTick()) {
         continue;
       }
       instance->widget->onFrameTick(deltaMs, *host->m_renderContext);
+      needsContinuousRedraw = true;
+    }
+
+    if (needsContinuousRedraw) {
+      surfacePtr->requestRedraw();
     }
   });
 }

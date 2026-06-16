@@ -335,7 +335,7 @@ void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest reques
   const bool isBottom = barConfig.position == "bottom";
   const bool isLeft = barConfig.position == "left";
   const bool isRight = barConfig.position == "right";
-  const std::int32_t panelGap = static_cast<std::int32_t>(Style::spaceXs);
+  const std::int32_t panelGap = m_config->config().shell.panel.floatingOffset;
   const std::int32_t screenPadding = static_cast<std::int32_t>(Style::spaceSm);
 
   std::int32_t outputWidth = static_cast<std::int32_t>(panelWidth);
@@ -1955,20 +1955,22 @@ void PanelManager::prepareFrame(bool needsUpdate, bool needsLayout) {
 void PanelManager::registerIpc(IpcService& ipc) {
   auto parseOpenArgs = [](std::string_view rawArgs, std::string_view command, std::string& panelId,
                           std::string& context) -> std::optional<std::string> {
-    const std::string args = StringUtils::trim(rawArgs);
+    const std::string_view args = StringUtils::trimLeftView(rawArgs);
     if (args.empty()) {
       return "error: " + std::string(command) + " requires a panel id\n";
     }
 
     const auto sep = args.find_first_of(" \t\n\r\f\v");
-    if (sep == std::string::npos) {
-      panelId = args;
+    if (sep == std::string_view::npos) {
+      panelId = std::string(args);
       context.clear();
       return std::nullopt;
     }
 
-    panelId = args.substr(0, sep);
-    context = StringUtils::trimLeftView(std::string_view(args).substr(sep + 1));
+    panelId = std::string(args.substr(0, sep));
+    // Preserve the context verbatim (only strip the separator's leading
+    // whitespace) — trailing whitespace can be significant, e.g. a command.
+    context = std::string(StringUtils::trimLeftView(args.substr(sep + 1)));
     return std::nullopt;
   };
 

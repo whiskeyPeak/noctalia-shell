@@ -244,6 +244,7 @@ void Application::scheduleNotificationShellRefresh() {
 }
 
 Application::~Application() {
+  TooltipManager::instance().shutdown();
   m_notificationManager.flushPersistedHistory();
   m_wayland.setClipboardService(nullptr);
   m_wayland.setTextInputService(nullptr);

@@ -68,6 +68,10 @@ namespace {
     std::string password;
     std::string serverUrl;
     std::string color;
+    bool idInvalid = false;
+    bool usernameInvalid = false;
+    bool passwordInvalid = false;
+    bool serverUrlInvalid = false;
   };
 
   bool validCalendarAccountId(std::string_view id) {
@@ -1069,11 +1073,13 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
                 .out = &idInput,
                 .value = draft->id,
                 .placeholder = "personal_icloud",
+                .invalid = draft->idInvalid,
                 .enabled = draft->creating,
                 .onChange = [draft](const std::string& value) {
                   if (draft->creating) {
                     draft->id = value;
                   }
+                  draft->idInvalid = false;
                 },
             })
         );
@@ -1099,7 +1105,11 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
                   .out = &usernameInput,
                   .value = draft->username,
                   .placeholder = i18n::tr("settings.calendar-accounts.username-placeholder"),
-                  .onChange = [draft](const std::string& value) { draft->username = value; },
+                  .invalid = draft->usernameInvalid,
+                  .onChange = [draft](const std::string& value) {
+                    draft->username = value;
+                    draft->usernameInvalid = false;
+                  },
               })
           );
           addField(
@@ -1110,7 +1120,11 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
                   .placeholder = draft->creating ? i18n::tr("settings.calendar-accounts.password-placeholder")
                                                  : i18n::tr("settings.calendar-accounts.password-keep-placeholder"),
                   .passwordMode = true,
-                  .onChange = [draft](const std::string& value) { draft->password = value; },
+                  .invalid = draft->passwordInvalid,
+                  .onChange = [draft](const std::string& value) {
+                    draft->password = value;
+                    draft->passwordInvalid = false;
+                  },
               })
           );
         }
@@ -1121,7 +1135,11 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
                   .out = &serverInput,
                   .value = draft->serverUrl,
                   .placeholder = "https://cloud.example.com/remote.php/dav/",
-                  .onChange = [draft](const std::string& value) { draft->serverUrl = value; },
+                  .invalid = draft->serverUrlInvalid,
+                  .onChange = [draft](const std::string& value) {
+                    draft->serverUrl = value;
+                    draft->serverUrlInvalid = false;
+                  },
               })
           );
         }
@@ -1158,45 +1176,33 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
           draft->password = trimInput(passwordInput);
           draft->serverUrl = trimInput(serverInput);
 
-          bool valid = true;
-          const auto mark = [&](Input* input) {
-            if (input != nullptr) {
-              input->setInvalid(true);
-            }
-            valid = false;
-          };
-          const auto unmark = [](Input* input) {
-            if (input != nullptr) {
-              input->setInvalid(false);
-            }
-          };
-          unmark(idInput);
-          unmark(usernameInput);
-          unmark(passwordInput);
-          unmark(serverInput);
+          draft->idInvalid = false;
+          draft->usernameInvalid = false;
+          draft->passwordInvalid = false;
+          draft->serverUrlInvalid = false;
 
           if (!validCalendarAccountId(draft->id)) {
-            mark(idInput);
+            draft->idInvalid = true;
           }
           if (draft->creating && calendarAccountIdExists(m_config->config(), draft->id)) {
-            mark(idInput);
+            draft->idInvalid = true;
           }
 
           const bool caldav = draft->provider != CalendarAccountProvider::Google;
           if (caldav && draft->username.empty()) {
-            mark(usernameInput);
+            draft->usernameInvalid = true;
           }
           if (draft->provider == CalendarAccountProvider::CustomCalDav && draft->serverUrl.empty()) {
-            mark(serverInput);
+            draft->serverUrlInvalid = true;
           }
           if (caldav && draft->password.empty()) {
             const std::string existing =
                 m_config->stateString(kCalendarCredentialOwner, draft->id + "_password").value_or(std::string{});
             if (existing.empty()) {
-              mark(passwordInput);
+              draft->passwordInvalid = true;
             }
           }
-          if (!valid) {
+          if (draft->idInvalid || draft->usernameInvalid || draft->passwordInvalid || draft->serverUrlInvalid) {
             showTransientStatus(i18n::tr("settings.calendar-accounts.invalid"), true);
             return;
           }

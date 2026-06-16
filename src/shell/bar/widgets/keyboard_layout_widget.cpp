@@ -293,10 +293,11 @@ namespace {
 
 KeyboardLayoutWidget::KeyboardLayoutWidget(
     CompositorPlatform& platform, std::string cycleCommand, DisplayMode displayMode, bool showIcon, bool showLabel,
-    bool hideWhenSingleLayout, std::unordered_map<std::string, std::string> customLabels
+    bool hideWhenSingleLayout, std::unordered_map<std::string, std::string> customLabels, std::string glyph
 )
     : m_platform(platform), m_cycleCommand(std::move(cycleCommand)), m_displayMode(displayMode), m_showIcon(showIcon),
-      m_showLabel(showLabel), m_hideWhenSingleLayout(hideWhenSingleLayout), m_customLabels(std::move(customLabels)) {}
+      m_showLabel(showLabel), m_hideWhenSingleLayout(hideWhenSingleLayout), m_customLabels(std::move(customLabels)),
+      m_glyphName(std::move(glyph)) {}
 
 void KeyboardLayoutWidget::create() {
   auto area = std::make_unique<InputArea>();
@@ -318,7 +319,7 @@ void KeyboardLayoutWidget::create() {
   area->addChild(
       ui::glyph({
           .out = &m_glyph,
-          .glyph = "keyboard",
+          .glyph = m_glyphName,
           .glyphSize = Style::baseGlyphSize * m_contentScale,
           .color = widgetIconColorOr(colorSpecFromRole(ColorRole::OnSurface)),
       })
@@ -360,7 +361,7 @@ void KeyboardLayoutWidget::doLayout(Renderer& renderer, float containerWidth, fl
     m_glyph->setGlyphSize(Style::baseGlyphSize * m_contentScale);
     m_glyph->setColor(widgetIconColorOr(colorSpecFromRole(ColorRole::OnSurface)));
     m_glyph->measure(renderer);
-    if (m_glyph->width() <= 0.0f) {
+    if (m_glyph->width() <= 0.0f && m_glyphName == "keyboard") {
       // Some icon fonts may miss the keyboard glyph; use a guaranteed fallback.
       m_glyph->setGlyph("world");
       m_glyph->measure(renderer);

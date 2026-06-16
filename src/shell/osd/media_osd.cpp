@@ -33,6 +33,10 @@ void MediaOsd::onMprisChanged(const MprisService& service) {
     return;
   }
 
+  if (activePlayer.playbackStatus != "Playing") {
+    return;
+  }
+
   if (osdData == m_lastData || m_overlay == nullptr) {
     return;
   }

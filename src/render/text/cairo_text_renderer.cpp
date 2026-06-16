@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <cairo.h>
 #include <cmath>
-#include <cstdlib>
 #include <cstring>
 #include <fontconfig/fontconfig.h>
 #include <functional>
@@ -23,26 +22,6 @@
 namespace {
 
   constexpr Logger kLog("text");
-
-  // Env-gated diagnostic for issue #2978 ("ghost spaces"): compares the caret
-  // position (pango_layout_get_cursor_pos) against the rendered logical width
-  // (pango_layout_get_extents) for strings with trailing whitespace. Enable
-  // with NOCTALIA_DEBUG_TEXT_TRAILING=1 and type trailing spaces into any input.
-  bool trailingWhitespaceDebugEnabled() {
-    static const bool enabled = [] {
-      const char* v = std::getenv("NOCTALIA_DEBUG_TEXT_TRAILING");
-      return v != nullptr && v[0] != '\0' && v[0] != '0';
-    }();
-    return enabled;
-  }
-
-  std::size_t trailingWhitespaceCount(std::string_view text) {
-    std::size_t count = 0;
-    while (count < text.size() && text[text.size() - 1 - count] == ' ') {
-      ++count;
-    }
-    return count;
-  }
 
   constexpr std::uint32_t kSizeQuant = 64;
   constexpr std::uint32_t kScaleQuant = 64;
@@ -479,26 +458,6 @@ CairoTextRenderer::TextMetrics CairoTextRenderer::metricsFromLayout(PangoLayout*
 
   const float width = static_cast<float>(logical.width) * pscale * invScale;
 
-  if (trailingWhitespaceDebugEnabled()) {
-    std::string_view layoutText(pango_layout_get_text(layout));
-    const std::size_t trailing = trailingWhitespaceCount(layoutText);
-    if (trailing > 0) {
-      const float inkW = static_cast<float>(ink.width) * pscale * invScale;
-      // Caret at end-of-text on the SAME layout: this is the position the input
-      // uses to place the cursor. If it diverges from the logical width (the
-      // rendered text extent), that delta is the visible ghost-space gap.
-      PangoRectangle strong{};
-      PangoRectangle weak{};
-      pango_layout_get_cursor_pos(layout, static_cast<int>(layoutText.size()), &strong, &weak);
-      const float caretEndX = static_cast<float>(strong.x) * pscale * invScale;
-      kLog.info(
-          "[#2978] measureText trailing={} text='{}' logicalW={:.2f} inkW={:.2f} caretEndX={:.2f} "
-          "caret-vs-logical={:.2f}",
-          trailing, layoutText, width, inkW, caretEndX, caretEndX - width
-      );
-    }
-  }
-
   // Pango logical rect y is 0 at top of layout box; baseline is offset from top.
   const float ascent = static_cast<float>(baselinePango - logical.y) * pscale * invScale;
   const float descent = static_cast<float>(logical.height - (baselinePango - logical.y)) * pscale * invScale;
@@ -652,22 +611,6 @@ void CairoTextRenderer::measureCursorStops(
     PangoRectangle weak{};
     pango_layout_get_cursor_pos(layout, index, &strong, &weak);
     outStops.push_back(static_cast<float>(strong.x) * pscale * invScale);
-  }
-
-  if (trailingWhitespaceDebugEnabled()) {
-    const std::size_t trailing = trailingWhitespaceCount(text);
-    if (trailing > 0) {
-      PangoRectangle ink{};
-      PangoRectangle logical{};
-      pango_layout_get_extents(layout, &ink, &logical);
-      const float caretEndX = outStops.empty() ? 0.0f : outStops.back();
-      const float extentsWidth = static_cast<float>(logical.width) * pscale * invScale;
-      const float inkWidth = static_cast<float>(ink.width) * pscale * invScale;
-      kLog.info(
-          "[#2978] trailing={} text='{}' caretEndX={:.2f} extentsLogicalW={:.2f} inkW={:.2f} caret-vs-extents={:.2f}",
-          trailing, text, caretEndX, extentsWidth, inkWidth, caretEndX - extentsWidth
-      );
-    }
   }
 
   g_object_unref(layout);

@@ -1756,6 +1756,10 @@
           "description": "When opening a specific tab (volume, media etc.)",
           "label": "Sidebar When Opening a Tab"
         },
+        "floating-offset": {
+          "description": "Gap in pixels between a floating or detached panel and the bar edge",
+          "label": "Floating Offset"
+        },
         "home-shortcuts": {
           "description": "Choose up to six shortcut buttons for the home tab",
           "label": "Home Shortcuts"
@@ -2558,7 +2562,8 @@
         },
         "glyph": {
           "description": "Icon glyph name",
-          "label": "Glyph"
+          "label": "Glyph",
+          "sysmon-description": "Custom icon glyph. Leave empty to use the icon for the selected stat."
         },
         "group-by-workspace": {
           "description": "Group taskbar icons into workspace capsules when compositor data is available",
