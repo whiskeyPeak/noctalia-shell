@@ -197,7 +197,10 @@ void DesktopClockWidget::create() {
       .fontSize = clockFontSize(contentScale()),
       .color = m_color,
       .fontWeight = FontWeight::Bold,
-      .textAlign = TextAlign::Center,
+      // Left-aligned inside the widest-digit reserved width (see updateStableDigitalWidth):
+      // the box stays put AND the leading glyphs (the first colon) don't drift as digits
+      // change advance width — only the trailing edge breathes into the reserved space.
+      .textAlign = TextAlign::Start,
   });
   m_digitalRoot->addChild(std::move(label));
   rootNode->addChild(std::move(digitalRoot));
@@ -521,6 +524,55 @@ void DesktopClockWidget::doLayout(Renderer& renderer) {
   layoutDigital(renderer);
 }
 
+void DesktopClockWidget::updateStableDigitalWidth(Renderer& renderer, const std::string& text) {
+  if (m_label == nullptr) {
+    return;
+  }
+
+  const float fontSize = clockFontSize(contentScale());
+
+  // Re-pick the widest digit only when the font identity (size or family) changes.
+  if (fontSize != m_metricsFontSize || m_fontFamily != m_metricsFontFamily) {
+    m_metricsFontSize = fontSize;
+    m_metricsFontFamily = m_fontFamily;
+    float widest = -1.0f;
+    for (char digit = '0'; digit <= '9'; ++digit) {
+      const std::string glyph(1, digit);
+      const float advance =
+          renderer.measureText(glyph, fontSize, FontWeight::Bold, 0.0f, 0, TextAlign::Start, m_fontFamily).width;
+      if (advance > widest) {
+        widest = advance;
+        m_widestDigit = digit;
+      }
+    }
+    m_stableSample.clear(); // force a width recompute below
+  }
+
+  // Normalize digits to the widest glyph: the result's width is invariant across
+  // seconds (and minutes), so the box keeps a constant size and never reflows.
+  std::string sample = text;
+  for (char& ch : sample) {
+    if (ch >= '0' && ch <= '9') {
+      ch = m_widestDigit;
+    }
+  }
+  if (sample == m_stableSample) {
+    return;
+  }
+  m_stableSample = sample;
+
+  const float width =
+      renderer.measureText(sample, fontSize, FontWeight::Bold, 0.0f, 0, TextAlign::Start, m_fontFamily).width;
+  if (std::abs(width - m_stableWidth) > 0.5f) {
+    m_stableWidth = width;
+    m_label->setMinWidth(m_stableWidth);
+    m_label->setMaxWidth(m_stableWidth);
+    // The reserved width changed (font, or a non-digit field like the date/AM-PM);
+    // this fires at most a couple of times a day, never on the per-second path.
+    requestLayout();
+  }
+}
+
 void DesktopClockWidget::doUpdate(Renderer& renderer) {
   if (m_style == Style::Analog) {
     updateAnalogHands();
@@ -533,6 +585,7 @@ void DesktopClockWidget::doUpdate(Renderer& renderer) {
 
   m_label->setFontSize(clockFontSize(contentScale()));
   const std::string text = formatText();
+  updateStableDigitalWidth(renderer, text);
   if (text == m_lastText) {
     return;
   }

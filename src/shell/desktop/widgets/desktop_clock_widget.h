@@ -37,6 +37,9 @@ private:
   void syncAnalogColors();
   void layoutAnalog(Renderer& renderer, float size);
   void layoutDigital(Renderer& renderer);
+  // Pin the digital label to the width of its widest-digit rendering so the box
+  // stops reflowing every second as proportional digits change advance width.
+  void updateStableDigitalWidth(Renderer& renderer, const std::string& text);
   void updateAnalogHands();
   [[nodiscard]] static Style styleFromSetting(std::string_view value);
 
@@ -59,4 +62,13 @@ private:
   int m_lastHour = -1;
   int m_lastMinute = -1;
   int m_lastSecond = -1;
+
+  // Stable-width state for the digital label. m_stableSample is the current text
+  // with every digit replaced by the widest digit glyph; its measured width is
+  // constant across seconds, so we only re-measure when it actually changes.
+  float m_stableWidth = 0.0f;
+  std::string m_stableSample;
+  char m_widestDigit = '0';
+  float m_metricsFontSize = -1.0f;
+  std::string m_metricsFontFamily;
 };
