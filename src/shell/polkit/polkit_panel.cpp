@@ -172,8 +172,9 @@ void PolkitPanel::doUpdate(Renderer& /*renderer*/) {
   if (!needsInput && !supplementaryText.empty() && !supplementaryError) {
     promptText = supplementaryText;
     supplementaryText.clear();
-  } else if (!supplementaryText.empty()
-             && (supplementaryError || supplementaryText == i18n::tr("auth.polkit.authenticating"))) {
+  } else if (
+      !supplementaryText.empty() && (supplementaryError || supplementaryText == i18n::tr("auth.polkit.authenticating"))
+  ) {
     promptText = supplementaryText;
     supplementaryText.clear();
   }
