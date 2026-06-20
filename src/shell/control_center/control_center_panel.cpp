@@ -68,7 +68,8 @@ ControlCenterPanel::ControlCenterPanel(
 }
 
 float ControlCenterPanel::preferredWidth() const {
-  const float fullSize = m_config != nullptr ? static_cast<float>(m_config->config().controlCenter.width) : 680.0f;
+  const float fullSize = m_config != nullptr ? static_cast<float>(m_config->config().controlCenter.width)
+                                             : static_cast<float>(ControlCenterConfig::kDefaultWidth);
   switch (sidebarModeForOpen(pendingOpenContext())) {
   case ControlCenterSidebarMode::Full:
     return fullSize * m_contentScale;
