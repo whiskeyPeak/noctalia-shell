@@ -51,6 +51,9 @@ BatteryWidget::BatteryWidget(
 
 void BatteryWidget::create() {
   auto container = std::make_unique<InputArea>();
+  container->setOnClick([this](const InputArea::PointerData& /*data*/) {
+    requestPanelToggle("control-center", "power");
+  });
   setRoot(std::move(container));
 
   if (m_displayMode == BatteryDisplayMode::Graphic) {
