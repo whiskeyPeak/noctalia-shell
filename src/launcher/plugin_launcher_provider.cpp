@@ -161,6 +161,12 @@ void PluginLauncherProvider::reloadScript() {
 }
 
 bool PluginLauncherProvider::activate(const LauncherResult& result) {
+  if (result.query.has_value()) {
+    if (m_onQueryRequested) {
+      m_onQueryRequested(*result.query);
+    }
+    return false;
+  }
   if (m_runtime != nullptr) {
     (void)m_runtime->enqueueCallStrings("onActivate", result.id, std::string(), {}, /*coalesce=*/false);
   }
@@ -168,6 +174,9 @@ bool PluginLauncherProvider::activate(const LauncherResult& result) {
 }
 
 void PluginLauncherProvider::handleResult(const scripting::ScriptResult& result) {
+  if (result.patch.launcherQuery.has_value() && m_onQueryRequested) {
+    m_onQueryRequested(*result.patch.launcherQuery);
+  }
   if (!result.patch.launcherResults.has_value()) {
     return;
   }
@@ -182,6 +191,7 @@ void PluginLauncherProvider::handleResult(const scripting::ScriptResult& result)
     lr.glyphName = r.glyph;
     lr.iconName = r.icon;
     lr.badge = r.badge;
+    lr.query = r.query;
     lr.score = r.score;
     m_cache.push_back(std::move(lr));
   }

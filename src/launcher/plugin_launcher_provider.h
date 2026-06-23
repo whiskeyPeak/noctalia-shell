@@ -51,6 +51,9 @@ public:
   [[nodiscard]] std::vector<LauncherCategory> categories() const override { return m_categories; }
   [[nodiscard]] bool isDynamic() const override { return true; }
   void setResultsChangedCallback(std::function<void()> callback) override { m_onResultsChanged = std::move(callback); }
+  void setQueryRequestedCallback(std::function<void(std::string)> callback) override {
+    m_onQueryRequested = std::move(callback);
+  }
 
   void initialize() override;
   void reset() override;
@@ -85,6 +88,7 @@ private:
   scripting::ScriptRuntime::SubscriberId m_subscription = 0;
   FileWatcher::WatchId m_watchId = 0;
   std::function<void()> m_onResultsChanged;
+  std::function<void(std::string)> m_onQueryRequested;
 
   // query() is const but maintains the async cache: the latest results, the query
   // they answer, and the query last dispatched (to avoid re-sending the same text).
