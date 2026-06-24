@@ -1,10 +1,12 @@
 #include "wayland/layer_surface.h"
 
 #include "core/log.h"
+#include "util/sys_utils.h"
 #include "wayland/wayland_connection.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 
 #include <stdexcept>
+#include <utility>
 #include <wayland-client.h>
 
 namespace {
@@ -15,6 +17,26 @@ namespace {
       .configure = &LayerSurface::handleConfigure,
       .closed = &LayerSurface::handleClosed,
   };
+
+  bool blurTraceEnabled() {
+    static const bool enabled = SysUtils::isEnvFlagOn("NOCTALIA_BLUR_TRACE");
+    return enabled;
+  }
+
+  void traceLayerCommit(const LayerSurface& surface, const LayerSurfaceConfig& config, std::string_view reason) {
+    if (!blurTraceEnabled()) {
+      return;
+    }
+
+    kLog.debug(
+        "blur-trace layer-commit reason={} name={} wl={} requested={}x{} default={}x{} anchor={} margins={},{},{},{} "
+        "exclusive={} layer={} keyboard={}",
+        reason, surface.debugName(), static_cast<const void*>(surface.wlSurface()), config.width, config.height,
+        config.defaultWidth, config.defaultHeight, config.anchor, config.marginTop, config.marginRight,
+        config.marginBottom, config.marginLeft, config.exclusiveZone, static_cast<std::uint32_t>(config.layer),
+        static_cast<std::uint32_t>(config.keyboard)
+    );
+  }
 
 } // namespace
 
@@ -30,7 +52,9 @@ LayerShellLayer layerShellLayerFromConfig(std::string_view layer) {
 }
 
 LayerSurface::LayerSurface(WaylandConnection& connection, LayerSurfaceConfig config)
-    : Surface(connection), m_config(std::move(config)) {}
+    : Surface(connection), m_config(std::move(config)) {
+  setDebugName("layer:" + m_config.nameSpace);
+}
 
 LayerSurface::~LayerSurface() {
   m_connection.unregisterSurface(m_surface);
@@ -89,6 +113,7 @@ bool LayerSurface::initialize(wl_output* output) {
   zwlr_layer_surface_v1_set_keyboard_interactivity(m_layerSurface, static_cast<std::uint32_t>(m_config.keyboard));
   applyInputRegion();
 
+  traceLayerCommit(*this, m_config, "initialize");
   wl_surface_commit(m_surface);
 
   setRunning(true);
@@ -161,6 +186,7 @@ void LayerSurface::requestSize(std::uint32_t width, std::uint32_t height) {
     m_config.defaultHeight = resolvedHeight;
   }
   zwlr_layer_surface_v1_set_size(m_layerSurface, resolvedWidth, resolvedHeight);
+  traceLayerCommit(*this, m_config, "request-size");
   wl_surface_commit(m_surface);
 }
 
@@ -173,6 +199,7 @@ void LayerSurface::setLayer(LayerShellLayer layer) {
     return;
   }
   zwlr_layer_surface_v1_set_layer(m_layerSurface, static_cast<std::uint32_t>(layer));
+  traceLayerCommit(*this, m_config, "set-layer");
   wl_surface_commit(m_surface);
 }
 
@@ -185,6 +212,7 @@ void LayerSurface::setMargins(std::int32_t top, std::int32_t right, std::int32_t
     return;
   }
   zwlr_layer_surface_v1_set_margin(m_layerSurface, top, right, bottom, left);
+  traceLayerCommit(*this, m_config, "set-margins");
   wl_surface_commit(m_surface);
 }
 
@@ -197,6 +225,7 @@ void LayerSurface::setExclusiveZone(std::int32_t exclusiveZone) {
     return;
   }
   zwlr_layer_surface_v1_set_exclusive_zone(m_layerSurface, exclusiveZone);
+  traceLayerCommit(*this, m_config, "set-exclusive-zone");
   wl_surface_commit(m_surface);
 }
 
@@ -211,6 +240,7 @@ void LayerSurface::setKeyboardInteractivity(LayerShellKeyboard mode) {
     return;
   }
   zwlr_layer_surface_v1_set_keyboard_interactivity(m_layerSurface, static_cast<std::uint32_t>(mode));
+  traceLayerCommit(*this, m_config, "set-keyboard");
   wl_surface_commit(m_surface);
 }
 
@@ -221,6 +251,7 @@ void LayerSurface::setClickThrough(bool clickThrough) {
   m_clickThrough = clickThrough;
   applyInputRegion();
   if (m_surface != nullptr) {
+    traceLayerCommit(*this, m_config, "set-click-through");
     wl_surface_commit(m_surface);
   }
 }

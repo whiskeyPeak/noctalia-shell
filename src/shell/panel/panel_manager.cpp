@@ -20,12 +20,14 @@
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "util/string_utils.h"
+#include "util/sys_utils.h"
 #include "wayland/layer_surface.h"
 #include "wayland/wayland_connection.h"
 #include "wayland/wayland_seat.h"
 
 #include <algorithm>
 #include <cmath>
+#include <format>
 #include <malloc.h>
 #include <string>
 
@@ -35,6 +37,11 @@ namespace {
 
   constexpr Logger kLog("panel");
   constexpr std::int32_t kDetachedPanelShadowSafetyPadding = 2;
+
+  bool blurTraceEnabled() {
+    static const bool enabled = SysUtils::isEnvFlagOn("NOCTALIA_BLUR_TRACE");
+    return enabled;
+  }
 
   struct BarVisibleRect {
     std::int32_t left = 0;
@@ -84,6 +91,25 @@ namespace {
     const auto total =
         static_cast<std::int64_t>(contentSize) + static_cast<std::int64_t>(before) + static_cast<std::int64_t>(after);
     return static_cast<std::uint32_t>(std::max<std::int64_t>(1, total));
+  }
+
+  InputRect boundsForPanelTrace(const std::vector<InputRect>& rects) {
+    if (rects.empty()) {
+      return {};
+    }
+
+    int minX = rects.front().x;
+    int minY = rects.front().y;
+    int maxX = rects.front().x + rects.front().width;
+    int maxY = rects.front().y + rects.front().height;
+    for (const auto& rect : rects) {
+      minX = std::min(minX, rect.x);
+      minY = std::min(minY, rect.y);
+      maxX = std::max(maxX, rect.x + rect.width);
+      maxY = std::max(maxY, rect.y + rect.height);
+    }
+
+    return InputRect{minX, minY, maxX - minX, maxY - minY};
   }
 
   BarConfig resolvePanelBarConfig(
@@ -1739,7 +1765,20 @@ void PanelManager::applyPanelCompositorBlur(
     return;
   }
 
+  if (blurTraceEnabled()) {
+    kLog.debug(
+        "blur-trace panel-blur-input mode={} progress={:.3f} phase={} surface={}x{} body={}:{}+{}x{} "
+        "clip={}:{}+{}x{}",
+        m_attachedToBar ? "attached" : "detached",
+        m_attachedToBar ? m_attachedRevealProgress : m_detachedRevealProgress, uiPhaseName(currentUiPhase()),
+        m_surface->width(), m_surface->height(), bodyX, bodyY, bodyW, bodyH, clipX, clipY, clipW, clipH
+    );
+  }
+
   if (bodyW <= 0 || bodyH <= 0 || clipW <= 0 || clipH <= 0) {
+    if (blurTraceEnabled()) {
+      kLog.debug("blur-trace panel-blur-clear reason=empty-input");
+    }
     m_surface->clearBlurRegion();
     return;
   }
@@ -1751,6 +1790,9 @@ void PanelManager::applyPanelCompositorBlur(
   const Radii radii = Radii{radius, radius, radius, radius};
   auto strips = Surface::tessellateShape(bodyX, bodyY, bodyW, bodyH, corners, logicalInset, radii);
   if (strips.empty()) {
+    if (blurTraceEnabled()) {
+      kLog.debug("blur-trace panel-blur-clear reason=empty-shape");
+    }
     m_surface->clearBlurRegion();
     return;
   }
@@ -1770,10 +1812,22 @@ void PanelManager::applyPanelCompositorBlur(
   }
 
   if (clipped.empty()) {
+    if (blurTraceEnabled()) {
+      kLog.debug("blur-trace panel-blur-clear reason=empty-clipped");
+    }
     m_surface->clearBlurRegion();
     return;
   }
 
+  if (blurTraceEnabled()) {
+    const auto bounds = boundsForPanelTrace(clipped);
+    kLog.debug(
+        "blur-trace panel-blur-set mode={} progress={:.3f} rects={} bounds={}:{}+{}x{}",
+        m_attachedToBar ? "attached" : "detached",
+        m_attachedToBar ? m_attachedRevealProgress : m_detachedRevealProgress, clipped.size(), bounds.x, bounds.y,
+        bounds.width, bounds.height
+    );
+  }
   m_surface->setBlurRegion(clipped);
 }
 

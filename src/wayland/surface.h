@@ -81,6 +81,7 @@ public:
   void setInputRegion(const std::vector<InputRect>& rects);
   void setBlurRegion(const std::vector<InputRect>& rects);
   void clearBlurRegion();
+  void setDebugName(std::string name);
 
   // Approximates a rounded rectangle as a stack of horizontal axis-aligned strips
   // suitable for `wl_region` (which has no curve primitives). The four corner radii
@@ -113,6 +114,7 @@ public:
   [[nodiscard]] RenderContext* renderContext() const noexcept { return m_renderContext; }
   [[nodiscard]] RenderTarget& renderTarget() noexcept { return m_renderTarget; }
   [[nodiscard]] wl_surface* wlSurface() const noexcept { return m_surface; }
+  [[nodiscard]] const std::string& debugName() const noexcept { return m_debugName; }
   [[nodiscard]] std::uint32_t width() const noexcept { return m_width; }
   [[nodiscard]] std::uint32_t height() const noexcept { return m_height; }
   [[nodiscard]] std::int32_t bufferScale() const noexcept { return m_bufferScale; }
@@ -165,6 +167,7 @@ private:
   RenderTarget m_renderTarget;
   AnimationManager* m_animationManager = nullptr;
   Node* m_sceneRoot = nullptr;
+  std::string m_debugName;
   std::shared_ptr<InvalidationToken> m_invalidationToken = std::make_shared<InvalidationToken>();
   ConfigureCallback m_configureCallback;
   PrepareFrameCallback m_prepareFrameCallback;

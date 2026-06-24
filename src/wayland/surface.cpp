@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <format>
 #include <ranges>
+#include <string>
 #include <string_view>
 #include <typeinfo>
 #include <unordered_map>
@@ -78,6 +79,99 @@ namespace {
   bool idleProfileEnabled() {
     static const bool enabled = SysUtils::isEnvFlagOn("NOCTALIA_IDLE_PROFILE");
     return enabled;
+  }
+
+  bool blurTraceEnabled() {
+    static const bool enabled = SysUtils::isEnvFlagOn("NOCTALIA_BLUR_TRACE");
+    return enabled;
+  }
+
+  std::string_view surfaceTraceName(const Surface& surface) {
+    const auto& name = surface.debugName();
+    if (name.empty()) {
+      return "surface";
+    }
+    return name;
+  }
+
+  InputRect boundsForRects(const std::vector<InputRect>& rects) {
+    if (rects.empty()) {
+      return {};
+    }
+
+    int minX = rects.front().x;
+    int minY = rects.front().y;
+    int maxX = rects.front().x + rects.front().width;
+    int maxY = rects.front().y + rects.front().height;
+    for (const auto& rect : rects) {
+      minX = std::min(minX, rect.x);
+      minY = std::min(minY, rect.y);
+      maxX = std::max(maxX, rect.x + rect.width);
+      maxY = std::max(maxY, rect.y + rect.height);
+    }
+
+    return InputRect{minX, minY, maxX - minX, maxY - minY};
+  }
+
+  std::string rectListPreview(const std::vector<InputRect>& rects) {
+    if (rects.empty()) {
+      return "[]";
+    }
+
+    constexpr std::size_t kPreviewCount = 6;
+    const std::size_t previewCount = std::min(kPreviewCount, rects.size());
+    std::string out = "[";
+    for (std::size_t i = 0; i < previewCount; ++i) {
+      const auto& rect = rects[i];
+      if (i > 0) {
+        out += " ";
+      }
+      out += std::format("{}:{}+{}x{}", rect.x, rect.y, rect.width, rect.height);
+    }
+    if (rects.size() > previewCount) {
+      out += std::format(" +{}", rects.size() - previewCount);
+    }
+    out += "]";
+    return out;
+  }
+
+  void traceSurfaceEvent(const Surface& surface, std::string_view event) {
+    if (!blurTraceEnabled()) {
+      return;
+    }
+
+    kLog.debug(
+        "blur-trace {} name={} self={} wl={} phase={} running={} logical={}x{} buffer={}x{} scale={:.3f}", event,
+        surfaceTraceName(surface), static_cast<const void*>(&surface), static_cast<const void*>(surface.wlSurface()),
+        uiPhaseName(currentUiPhase()), surface.isRunning(), surface.width(), surface.height(),
+        surface.bufferWidthFor(surface.width()), surface.bufferHeightFor(surface.height()),
+        surface.effectiveBufferScale()
+    );
+  }
+
+  void traceBlurRegionEvent(const Surface& surface, std::string_view event, const std::vector<InputRect>& rects) {
+    if (!blurTraceEnabled()) {
+      return;
+    }
+
+    const InputRect bounds = boundsForRects(rects);
+    const int right = bounds.x + bounds.width;
+    const int bottom = bounds.y + bounds.height;
+    const bool fullSurface = !rects.empty()
+        && surface.width() > 0
+        && surface.height() > 0
+        && bounds.x <= 0
+        && bounds.y <= 0
+        && right >= static_cast<int>(surface.width())
+        && bottom >= static_cast<int>(surface.height());
+    kLog.debug(
+        "blur-trace {} name={} self={} wl={} phase={} logical={}x{} scale={:.3f} rects={} bounds={}:{}+{}x{} "
+        "full_surface={} sample={}",
+        event, surfaceTraceName(surface), static_cast<const void*>(&surface),
+        static_cast<const void*>(surface.wlSurface()), uiPhaseName(currentUiPhase()), surface.width(), surface.height(),
+        surface.effectiveBufferScale(), rects.size(), bounds.x, bounds.y, bounds.width, bounds.height, fullSurface,
+        rectListPreview(rects)
+    );
   }
 
   struct SurfaceProfileState {
@@ -225,6 +319,8 @@ Surface::~Surface() {
 
 bool Surface::isRunning() const noexcept { return m_running; }
 
+void Surface::setDebugName(std::string name) { m_debugName = std::move(name); }
+
 float Surface::effectiveBufferScale() const noexcept {
   if (m_fractionalScale != nullptr && m_viewport != nullptr) {
     if (m_fractionalScaleNumerator > 0) {
@@ -298,6 +394,7 @@ bool Surface::createWlSurface() {
   if (m_surface == nullptr) {
     return false;
   }
+  traceSurfaceEvent(*this, "create-wl-surface");
   wl_surface_add_listener(m_surface, &kSurfaceListener, this);
 
   initializeSurfaceScaleProtocol();
@@ -312,6 +409,7 @@ void Surface::onConfigure(std::uint32_t width, std::uint32_t height) {
   m_width = width;
   m_height = height;
   m_configured = true;
+  traceSurfaceEvent(*this, "configure");
 
   const float resizeMs = elapsedMs([this] {
     applySurfaceScaleState();
@@ -492,31 +590,41 @@ void Surface::setInputRegion(const std::vector<InputRect>& rects) {
 }
 
 void Surface::setBlurRegion(const std::vector<InputRect>& rects) {
-  if (m_surface == nullptr || !m_connection.hasBackgroundEffectBlur()) {
+  if (m_surface == nullptr) {
+    traceSurfaceEvent(*this, "blur-set-skip-no-surface");
+    return;
+  }
+  if (!m_connection.hasBackgroundEffectBlur()) {
+    traceSurfaceEvent(*this, "blur-set-skip-no-protocol");
     return;
   }
 
   if (m_backgroundEffect == nullptr) {
     auto* manager = m_connection.backgroundEffectManager();
     if (manager == nullptr) {
+      traceSurfaceEvent(*this, "blur-set-skip-no-manager");
       return;
     }
     m_backgroundEffect = ext_background_effect_manager_v1_get_background_effect(manager, m_surface);
     if (m_backgroundEffect == nullptr) {
+      traceSurfaceEvent(*this, "blur-set-skip-create-failed");
       return;
     }
+    traceSurfaceEvent(*this, "blur-effect-create");
   }
 
   wl_region* region = nullptr;
   if (!rects.empty()) {
     region = wl_compositor_create_region(m_connection.compositor());
     if (region == nullptr) {
+      traceSurfaceEvent(*this, "blur-set-skip-region-failed");
       return;
     }
     for (const auto& r : rects) {
       wl_region_add(region, r.x, r.y, r.width, r.height);
     }
   }
+  traceBlurRegionEvent(*this, rects.empty() ? "blur-set-empty" : "blur-set", rects);
   ext_background_effect_surface_v1_set_blur_region(m_backgroundEffect, region);
   if (region != nullptr) {
     wl_region_destroy(region);
@@ -776,8 +884,10 @@ std::vector<InputRect> Surface::tessellateShape(
 
 void Surface::clearBlurRegion() {
   if (m_backgroundEffect == nullptr) {
+    traceSurfaceEvent(*this, "blur-clear-no-effect");
     return;
   }
+  traceSurfaceEvent(*this, "blur-clear-destroy");
   ext_background_effect_surface_v1_destroy(m_backgroundEffect);
   m_backgroundEffect = nullptr;
 }
@@ -845,7 +955,9 @@ void Surface::render() {
   }
 
   requestFrame();
+  traceSurfaceEvent(*this, "render-begin");
   const float renderMs = elapsedMs([this] { m_renderContext->renderScene(m_renderTarget, m_sceneRoot); });
+  traceSurfaceEvent(*this, "render-end");
   recordSurfaceProfileEvent(*this, SurfaceProfileEvent::Render, renderMs);
   logSlowSurfaceOperation(
       renderMs, "surface render took {:.1f}ms ({}x{} logical, {}x{} buffer)", renderMs, m_width, m_height,
