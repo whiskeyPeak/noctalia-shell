@@ -287,7 +287,10 @@ void Label::startMarqueeLoop() {
 
   const float period = m_marqueeLoopPeriod;
   const float durationMs = (period / m_scrollSpeedPxPerSec) * 1000.0f;
-  m_marqueeAnimId = animationManager()->animate(
+  // Marquee scroll is content motion at a fixed px/sec rate, not a UI transition:
+  // it must keep scrolling (and at its own speed) regardless of the global motion
+  // enable/speed settings, so drive it off real elapsed time.
+  m_marqueeAnimId = animationManager()->animateTimer(
       0.0f, period, durationMs, Easing::Linear,
       [this](float v) {
         m_scrollOffset = v;
