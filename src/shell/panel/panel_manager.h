@@ -165,9 +165,8 @@ private:
   // using the cached attached background opacity and bar position. Geometry/positions are not touched.
   // Safe to call any time after buildScene has run.
   void applyAttachedDecorationStyle();
-  // Submit a wl_region matching the visible panel body to the compositor for blur.
-  // Clips by the current reveal progress so blur grows in lock-step with animation.
-  void applyPanelCompositorBlur();
+  // Submit a wl_region matching the panel body after applying the current reveal clip.
+  void applyPanelCompositorBlur(int bodyX, int bodyY, int bodyW, int bodyH, int clipX, int clipY, int clipW, int clipH);
 
   CompositorPlatform* m_platform = nullptr;
   ConfigService* m_config = nullptr;

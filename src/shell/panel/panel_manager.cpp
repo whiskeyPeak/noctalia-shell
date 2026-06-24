@@ -886,7 +886,7 @@ void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest reques
       m_surface->setInputRegion(
           {InputRect{m_panelInsetX, m_panelInsetY, static_cast<int>(panelWidth), static_cast<int>(panelHeight)}}
       );
-      applyPanelCompositorBlur();
+      m_surface->clearBlurRegion();
       publishAttachedPanelGeometry(m_attachedRevealProgress);
       m_surface->requestRedraw();
       const bool hasFocusGrab = m_platform != nullptr
@@ -974,7 +974,7 @@ void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest reques
   m_surface->setInputRegion(
       {InputRect{m_panelInsetX, m_panelInsetY, static_cast<int>(panelWidth), static_cast<int>(panelHeight)}}
   );
-  applyPanelCompositorBlur();
+  m_surface->clearBlurRegion();
   // Defer the focus grab to the next tick. See attached-path comment above.
   const std::uint64_t gen = m_destroyGeneration;
   DeferredCall::callLater([this, gen]() {
@@ -1529,6 +1529,9 @@ void PanelManager::onKeyboardEvent(const KeyboardEvent& event) {
 void PanelManager::applyAttachedReveal(float progress) {
   m_attachedRevealProgress = std::clamp(progress, 0.0f, 1.0f);
   if (!m_attachedToBar || m_attachedRevealClipNode == nullptr || m_sceneRoot == nullptr) {
+    if (m_attachedToBar && m_surface != nullptr) {
+      m_surface->clearBlurRegion();
+    }
     return;
   }
 
@@ -1577,12 +1580,20 @@ void PanelManager::applyAttachedReveal(float progress) {
   }
 
   publishAttachedPanelGeometry(m_attachedRevealProgress);
-  applyPanelCompositorBlur();
+  const int bodyX = m_panelInsetX + static_cast<int>(std::lround(contentX));
+  const int bodyY = m_panelInsetY + static_cast<int>(std::lround(contentY));
+  applyPanelCompositorBlur(
+      bodyX, bodyY, static_cast<int>(m_panelVisualWidth), static_cast<int>(m_panelVisualHeight), 0, 0,
+      static_cast<int>(std::lround(w)), static_cast<int>(std::lround(h))
+  );
 }
 
 void PanelManager::applyDetachedReveal(float progress) {
   m_detachedRevealProgress = std::clamp(progress, 0.0f, 1.0f);
   if (m_attachedToBar || m_sceneRoot == nullptr) {
+    if (!m_attachedToBar && m_surface != nullptr) {
+      m_surface->clearBlurRegion();
+    }
     return;
   }
 
@@ -1620,7 +1631,11 @@ void PanelManager::applyDetachedReveal(float progress) {
   if (m_contentNode != nullptr) {
     m_contentNode->setOpacity(panelRevealContentOpacity(m_detachedRevealProgress));
   }
-  applyPanelCompositorBlur();
+  applyPanelCompositorBlur(
+      m_panelInsetX, m_panelInsetY, static_cast<int>(m_panelVisualWidth), static_cast<int>(m_panelVisualHeight),
+      static_cast<int>(std::lround(clipX)), static_cast<int>(std::lround(clipY)), static_cast<int>(std::lround(clipW)),
+      static_cast<int>(std::lround(clipH))
+  );
 }
 
 void PanelManager::startAttachedOpenAnimation() {
@@ -1714,87 +1729,19 @@ void PanelManager::publishAttachedPanelGeometry(float revealProgress) {
   m_attachedPanelGeometryCallback(m_output, m_sourceBarName, geometry);
 }
 
-void PanelManager::applyPanelCompositorBlur() {
-  // The blur region is submitted on every panel surface.
-  // As of niri 26.04, subsurfaces are ignored for ext-background-effect-v1.
+void PanelManager::applyPanelCompositorBlur(
+    int bodyX, int bodyY, int bodyW, int bodyH, int clipX, int clipY, int clipW, int clipH
+) {
+  // The blur region is compositor surface state, not a scene node. Callers pass the
+  // same body and clip rectangles used by the reveal animation so protocol state
+  // cannot get ahead of scene rendering.
   if (m_surface == nullptr || m_activePanel == nullptr) {
     return;
   }
 
-  int bx = m_panelInsetX;
-  int by = m_panelInsetY;
-  int bw = static_cast<int>(m_panelVisualWidth);
-  int bh = static_cast<int>(m_panelVisualHeight);
-  if (bw <= 0 || bh <= 0) {
+  if (bodyW <= 0 || bodyH <= 0 || clipW <= 0 || clipH <= 0) {
     m_surface->clearBlurRegion();
     return;
-  }
-
-  if (!m_attachedToBar) {
-    const float progress = std::clamp(m_detachedRevealProgress, 0.0f, 1.0f);
-    if (progress < 0.001f) {
-      m_surface->clearBlurRegion();
-      return;
-    }
-    const int surfaceW = std::max(1, static_cast<int>(m_surface->width()));
-    const int surfaceH = std::max(1, static_cast<int>(m_surface->height()));
-    int clipX = 0;
-    int clipY = 0;
-    int clipW = surfaceW;
-    int clipH = surfaceH;
-    switch (m_detachedRevealDirection) {
-    case AttachedRevealDirection::Down:
-      clipH = static_cast<int>(std::lround(static_cast<float>(surfaceH) * progress));
-      break;
-    case AttachedRevealDirection::Up:
-      clipH = static_cast<int>(std::lround(static_cast<float>(surfaceH) * progress));
-      clipY = surfaceH - clipH;
-      break;
-    case AttachedRevealDirection::Right:
-      clipW = static_cast<int>(std::lround(static_cast<float>(surfaceW) * progress));
-      break;
-    case AttachedRevealDirection::Left:
-      clipW = static_cast<int>(std::lround(static_cast<float>(surfaceW) * progress));
-      clipX = surfaceW - clipW;
-      break;
-    }
-
-    const int clippedX = std::max(bx, clipX);
-    const int clippedY = std::max(by, clipY);
-    const int clippedRight = std::min(bx + bw, clipX + clipW);
-    const int clippedBottom = std::min(by + bh, clipY + clipH);
-    bw = clippedRight - clippedX;
-    bh = clippedBottom - clippedY;
-    if (bw <= 0 || bh <= 0) {
-      m_surface->clearBlurRegion();
-      return;
-    }
-    bx = clippedX;
-    by = clippedY;
-  } else {
-    // Mirror the slide that the visible content node performs in applyAttachedReveal.
-    // This keeps the blur region in lockstep with what is actually on screen.
-    const float progress = std::clamp(m_attachedRevealProgress, 0.0f, 1.0f);
-    if (progress < 0.001f) {
-      m_surface->clearBlurRegion();
-      return;
-    }
-    const auto panelW = static_cast<float>(m_panelVisualWidth);
-    const auto panelH = static_cast<float>(m_panelVisualHeight);
-    switch (m_attachedRevealDirection) {
-    case AttachedRevealDirection::Down:
-      by -= static_cast<int>(std::lround(panelH * (1.0f - progress)));
-      break;
-    case AttachedRevealDirection::Up:
-      by += static_cast<int>(std::lround(panelH * (1.0f - progress)));
-      break;
-    case AttachedRevealDirection::Right:
-      bx -= static_cast<int>(std::lround(panelW * (1.0f - progress)));
-      break;
-    case AttachedRevealDirection::Left:
-      bx += static_cast<int>(std::lround(panelW * (1.0f - progress)));
-      break;
-    }
   }
 
   const float radius = Style::scaledRadiusXl(m_activePanel->contentScale());
@@ -1802,35 +1749,32 @@ void PanelManager::applyPanelCompositorBlur() {
   const RectInsets logicalInset =
       m_attachedToBar ? attached_panel::logicalInset(m_attachedBarPosition, radius) : RectInsets{};
   const Radii radii = Radii{radius, radius, radius, radius};
-  auto strips = Surface::tessellateShape(bx, by, bw, bh, corners, logicalInset, radii);
+  auto strips = Surface::tessellateShape(bodyX, bodyY, bodyW, bodyH, corners, logicalInset, radii);
   if (strips.empty()) {
     m_surface->clearBlurRegion();
     return;
   }
 
-  if (m_attachedToBar && m_sceneRoot != nullptr) {
-    const int clipMaxX = static_cast<int>(std::lround(m_sceneRoot->width()));
-    const int clipMaxY = static_cast<int>(std::lround(m_sceneRoot->height()));
-    std::vector<InputRect> clipped;
-    clipped.reserve(strips.size());
-    for (const auto& s : strips) {
-      const int sxLeft = std::max(s.x, 0);
-      const int sxRight = std::min(s.x + s.width, clipMaxX);
-      const int syTop = std::max(s.y, 0);
-      const int syBot = std::min(s.y + s.height, clipMaxY);
-      if (sxRight > sxLeft && syBot > syTop) {
-        clipped.push_back({sxLeft, syTop, sxRight - sxLeft, syBot - syTop});
-      }
+  const int clipRight = clipX + clipW;
+  const int clipBottom = clipY + clipH;
+  std::vector<InputRect> clipped;
+  clipped.reserve(strips.size());
+  for (const auto& s : strips) {
+    const int sxLeft = std::max(s.x, clipX);
+    const int sxRight = std::min(s.x + s.width, clipRight);
+    const int syTop = std::max(s.y, clipY);
+    const int syBottom = std::min(s.y + s.height, clipBottom);
+    if (sxRight > sxLeft && syBottom > syTop) {
+      clipped.push_back({sxLeft, syTop, sxRight - sxLeft, syBottom - syTop});
     }
-    if (clipped.empty()) {
-      m_surface->clearBlurRegion();
-      return;
-    }
-    m_surface->setBlurRegion(clipped);
+  }
+
+  if (clipped.empty()) {
+    m_surface->clearBlurRegion();
     return;
   }
 
-  m_surface->setBlurRegion(strips);
+  m_surface->setBlurRegion(clipped);
 }
 
 void PanelManager::applyAttachedDecorationStyle() {
@@ -1898,7 +1842,11 @@ void PanelManager::onConfigReloaded() {
     return;
   }
 
-  applyPanelCompositorBlur();
+  if (m_attachedToBar) {
+    applyAttachedReveal(m_attachedRevealProgress);
+  } else {
+    applyDetachedReveal(m_detachedRevealProgress);
+  }
   const float panelBackgroundOpacity =
       m_attachedToBar ? m_attachedBackgroundOpacity : resolveDetachedPanelBackgroundOpacity(m_config);
   m_activePanel->setPanelCardOpacity(resolvePanelCardOpacity(m_config, panelBackgroundOpacity));
